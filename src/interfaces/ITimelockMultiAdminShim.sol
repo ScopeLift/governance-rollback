@@ -41,4 +41,19 @@ interface ITimelockMultiAdminShim is ICompoundTimelock {
      * @return True if the address is an authorized executor, false otherwise.
      */
     function isExecutor(address executor) external view returns (bool);
+
+    /**
+     * @notice Returns the address of the Upgrade Regression Manager.
+     * @return The address of the Upgrade Regression Manager.
+     */
+    function upgradeRegressionManager() external view returns (address);
+
+    /**
+     * @notice Returns the address of the admin.
+     * @return The address of the admin.
+     */
+    function admin() external view returns (address);
+
+    // QUESTIONS:
+    //   can we add a function to set the upgrade regression manager ?
 }
