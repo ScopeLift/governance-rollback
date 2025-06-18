@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "prepare": "husky",
-    "test": "echo \"no tests\""
+    "test": "forge test"
   },
   "keywords": [],
   "author": "ScopeLift",

@@ -29,3 +29,6 @@
   single_line_statement_blocks = "multi"
   tab_width = 2
   wrap_comments = true
+
+[profile.docs]
+  src = 'src/interfaces/'
