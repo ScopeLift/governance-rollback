@@ -16,3 +16,6 @@ lcov.info
 # IDEs
 .vscode
 .idea
+
+# Library
+node_modules/
