@@ -1,150 +1,125 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-// External Libraries
+// External Imports
 import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompoundTimelock.sol";
 
-// Internal Libraries
-import {IUpgradeRegressionManager} from "interfaces/IUpgradeRegressionManager.sol";
+// Internal Imports
+import {ITimelockMultiAdminShim} from "interfaces/ITimelockMultiAdminShim.sol";
 
-contract TimelockMultiAdminShim {
-  error TimelockMultiAdminShim_Unauthorized();
+contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
 
-  // TODO: add an interface for the Governor
-  address public immutable GOVERNOR;
+  /*///////////////////////////////////////////////////////////////
+                            Storage
+  //////////////////////////////////////////////////////////////*/
 
+  /// @inheritdoc ITimelockMultiAdminShim
+  address public governor;
+
+  /// @inheritdoc ITimelockMultiAdminShim
   ICompoundTimelock public immutable TIMELOCK;
-  IUpgradeRegressionManager public immutable URM;
 
+  /// @inheritdoc ITimelockMultiAdminShim
   mapping(address => bool) public isExecutor;
 
-  // mapping to track all function signatures that are allowed to be called by the Governor
-  mapping(bytes4 => bool) internal _governorAuthorizedSelectors;
-
-  modifier onlyTimelock() {
-    if (msg.sender != address(TIMELOCK)) revert TimelockMultiAdminShim_Unauthorized();
-    _;
-  }
+  /*///////////////////////////////////////////////////////////////
+                            Constructor
+  //////////////////////////////////////////////////////////////*/
 
   /**
    * @notice Constructor for the TimelockMultiAdminShim contract.
    * @param _governor The address of the Governor contract.
    * @param _timelock The address of the Compound Timelock contract.
-   * @param _upgradeRegressionManager The address of the Upgrade Regression Manager contract.
    */
-  constructor(address _governor, ICompoundTimelock _timelock, IUpgradeRegressionManager _upgradeRegressionManager) {
-    
-    // TODO: Add zero address checks
+  constructor(address _governor, ICompoundTimelock _timelock) {
 
-    GOVERNOR = _governor;
+    // Validate inputs
+    if (_governor == address(0)) revert TimelockMultiAdminShim__InvalidGovernor();
+    if (address(_timelock) == address(0)) revert TimelockMultiAdminShim__InvalidTimelock();
+
+    // Initialize storage
+    governor = _governor;
     TIMELOCK = _timelock;
-    URM = _upgradeRegressionManager;
 
-    _setGovernorAuthorizedFunctions();
+    // ASK-TEAM: Add event for initialization ?
   }
 
-  ///// Proxy for the timelock /////
+  /*///////////////////////////////////////////////////////////////
+                    Proxy Timelock Functions 
+  //////////////////////////////////////////////////////////////*/
 
+  /// @inheritdoc ITimelockMultiAdminShim
   function queueTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta ) public returns (bytes32) {
-
-    _isAuthorized(target, signature);
-    
-    // ASK-TEAM: would the timelock be updated to have shim be the admin ? 
-
-    if (target == address(URM)) {
-
-      // example: { target: URM, calldata: queueOperations(proposalId, [contractA], [0], [setFee(0)]) }
-      // ASK-TEAM: 
-      // When the target == URM, we're actually passing encoded rollback data in data. 
-      // That’s the “double-encoded” part in the proposal docs.
-      // So what we'd need to do 
-      //  - decode data into its actual inputs b
-      //  - call URM.queueRollbackOperations(...)
-      (
-        bytes32 proposalId, // ASK-TEAM: how do i get proposalId ? I think we need to pass it in the data
-        address[] memory rollbackTargets,
-        uint256[] memory rollbackValues,
-        bytes[] memory rollbackCalldatas
-      ) = abi.decode(data, (bytes32, address[], uint256[], bytes[]));
-
-      URM.queueRollbackOperations(
-        proposalId,
-        rollbackTargets,
-        rollbackValues,
-        rollbackCalldatas
-      );
-
-      return proposalId;
-    }
-
-    // example: { target: contractA,  calldata: setFee(1e18) }
+    _revertIfCannotQueue(target);
     return TIMELOCK.queueTransaction(target, value, signature, data, eta);
   }
 
+  /// @inheritdoc ITimelockMultiAdminShim
   function cancelTransaction(address target, uint value, string memory signature, bytes memory data, uint eta) public {
     TIMELOCK.cancelTransaction(target, value, signature, data, eta);
   }
 
+  /// @inheritdoc ITimelockMultiAdminShim
   function executeTransaction(address target, uint value, string memory signature, bytes memory data, uint eta) public payable returns (bytes memory) {
     return TIMELOCK.executeTransaction(target, value, signature, data, eta);
   }
 
-  // ASK-TEAM:Functions ignored cause governor doesn't call them
-  // setDelay(uint delay_)
-  // acceptAdmin
-  // setPendingAdmin
+  /*///////////////////////////////////////////////////////////////
+                      External Functions
+  //////////////////////////////////////////////////////////////*/
 
-
-  ///// Core Management /////
-
-  function addExecutor(address _newExecutor) public onlyTimelock {
+  /// @inheritdoc ITimelockMultiAdminShim
+  function addExecutor(address _newExecutor) public {
+    _revertIfNotTimelock();
     isExecutor[_newExecutor] = true;
+    emit ExecutorAdded(_newExecutor);
   }
 
-  function removeExecutor(address _executor) public onlyTimelock {
+  /// @inheritdoc ITimelockMultiAdminShim
+  function removeExecutor(address _executor) public {
+    _revertIfNotTimelock();
     isExecutor[_executor] = false;
+    emit ExecutorRemoved(_executor);
   }
 
-  /**
-   * @notice Registers function selectors that the governor is allowed to call on this contract.
-   */
-  function _setGovernorAuthorizedFunctions() internal {
-    string[2] memory authorizedSignatures = [
-      "addExecutor(address)",
-      "removeExecutor(address)"
-    ];
-
-    for (uint256 i = 0; i < authorizedSignatures.length; i++) {
-      _governorAuthorizedSelectors[bytes4(keccak256(bytes(authorizedSignatures[i])))] = true;
-    }
+  /// @inheritdoc ITimelockMultiAdminShim
+  function updateGovernor(address _newGovernor) public {
+    _revertIfNotTimelock();
+    governor = _newGovernor;
+    emit GovernorUpdated(_newGovernor);
   }
 
+  /*///////////////////////////////////////////////////////////////
+                        Internal Functions
+  //////////////////////////////////////////////////////////////*/
+
   /**
-   * @notice Checks if the caller is authorized to queue a specific function call via the TimelockShim.
+   * @notice Validates authorization for queueing transactions to the timelock.
    * @param target The address of the contract that the function call targets.
-   * @param signature The function signature (e.g., "setAdmin(address)").
-   * @return True if the call is authorized, otherwise reverts.
+   * @dev Reverts with TimelockMultiAdminShim__Unauthorized if:
+   *      - The target is this contract and the caller is not the governor.
+   *      - Allows any caller to queue transactions targeting external contracts.
    */
-  function _isAuthorized(address target, string memory signature) internal view returns (bool) {
-    // Case 1: The call is targeting this contract (the shim itself)
-    if (target == address(this)) {
-      // Compute the function selector from the signature string
-      bytes4 selector = bytes4(keccak256(bytes(signature)));
-
-      // Check if the selector is authorized and the sender is the GOVERNOR
-      if (_governorAuthorizedSelectors[selector] && msg.sender == GOVERNOR) {
-        return true;
-      }
-
-      revert TimelockMultiAdminShim_Unauthorized();
+  function _revertIfCannotQueue(address target) internal view {
+    if (target == address(this) && msg.sender != governor) {
+      revert TimelockMultiAdminShim__Unauthorized();
     }
+  }
 
-    // Case 2:The call targets an external contract (not this one),
-    // allow it by default — assumed safe/external logic.
-    return true;
+  /**
+   * @notice Reverts if the caller is not the timelock.
+   */
+  function _revertIfNotTimelock() internal view {
+    if (msg.sender != address(TIMELOCK)) {
+      revert TimelockMultiAdminShim__Unauthorized();
+    }
   }
 }
 
+
+/*///////////////////////////////////////////////////////////////
+                      Team Notes
+//////////////////////////////////////////////////////////////*/
 
 // This method should only be callable by the TIMELOCK *when the transaction originated from the Governor*
 // Ways we might be able to do this:
