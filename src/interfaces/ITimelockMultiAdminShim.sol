@@ -7,16 +7,16 @@ import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompou
 /**
  * @title ITimelockMultiAdminShim
  * @author [ScopeLift](https://scopelift.co)
- * @notice Interface for a Timelock shim that supports multiple executors and a mutable governor.
+ * @notice Interface for a Timelock shim that supports multiple executors and a mutable admin.
  * @dev This interface defines functions and events for managing a timelock with multiple authorized executors,
- *      a changeable governor, and secure queuing, cancelling, and execution of transactions via a timelock.
+ *      a changeable admin, and secure queuing, cancelling, and execution of transactions via a timelock.
  *
  *      Security Model:
  *      - Anyone can queue transactions targeting external contracts
- *      - Only the governor can queue transactions targeting this shim (addExecutor, removeExecutor, updateGovernor)
+ *      - Only the admin or an executor can queue transactions targeting this shim
  *      - All shim configuration changes must go through the timelock (with delay)
  *      - The timelock is the only entity that can execute changes to the shim
- *      - This creates a two-step process: governor queues → timelock executes after delay
+ *      - This creates a two-step process: admin queues → timelock executes after delay
  */
 interface ITimelockMultiAdminShim {
   /*///////////////////////////////////////////////////////////////
@@ -26,8 +26,8 @@ interface ITimelockMultiAdminShim {
   /// @notice Emitted when an unauthorized caller attempts to queue a transaction.
   error TimelockMultiAdminShim__Unauthorized();
 
-  /// @notice Emitted when an invalid governor address is provided.
-  error TimelockMultiAdminShim__InvalidGovernor();
+  /// @notice Emitted when an invalid admin address is provided.
+  error TimelockMultiAdminShim__InvalidAdmin();
 
   /// @notice Emitted when an invalid timelock address is provided.
   error TimelockMultiAdminShim__InvalidTimelock();
@@ -49,17 +49,17 @@ interface ITimelockMultiAdminShim {
   event ExecutorRemoved(address indexed executor);
 
   /**
-   * @notice Emitted when the governor is updated.
-   * @param governor The address of the new governor.
+   * @notice Emitted when the admin is updated.
+   * @param admin The address of the new admin.
    */
-  event GovernorUpdated(address indexed governor);
+  event AdminUpdated(address indexed admin);
 
   /*///////////////////////////////////////////////////////////////
                       Public Storage Variables
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice The address of the governor.
-  function governor() external view returns (address);
+  /// @notice The address of the admin.
+  function admin() external view returns (address);
 
   /// @notice The timelock contract.
   function TIMELOCK() external view returns (ICompoundTimelock);
@@ -130,8 +130,8 @@ interface ITimelockMultiAdminShim {
   function removeExecutor(address _executor) external;
 
   /**
-   * @notice Updates the governor.
-   * @param _newGovernor The address of the new governor.
+   * @notice Updates the admin.
+   * @param _newAdmin The address of the new admin.
    */
-  function updateGovernor(address _newGovernor) external;
+  function updateAdmin(address _newAdmin) external;
 }

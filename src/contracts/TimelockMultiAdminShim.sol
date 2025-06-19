@@ -13,7 +13,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
   //////////////////////////////////////////////////////////////*/
 
   /// @inheritdoc ITimelockMultiAdminShim
-  address public governor;
+  address public admin;
 
   /// @inheritdoc ITimelockMultiAdminShim
   ICompoundTimelock public immutable TIMELOCK;
@@ -27,20 +27,20 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
 
   /**
    * @notice Constructor for the TimelockMultiAdminShim contract.
-   * @param _governor The address of the Governor contract.
+   * @param _admin The address of the Admin contract.
    * @param _timelock The address of the Compound Timelock contract.
    */
-  constructor(address _governor, ICompoundTimelock _timelock) {
+  constructor(address _admin, ICompoundTimelock _timelock) {
     // Validate inputs
-    if (_governor == address(0)) {
-      revert TimelockMultiAdminShim__InvalidGovernor();
+    if (_admin == address(0)) {
+      revert TimelockMultiAdminShim__InvalidAdmin();
     }
     if (address(_timelock) == address(0)) {
       revert TimelockMultiAdminShim__InvalidTimelock();
     }
 
     // Initialize storage
-    governor = _governor;
+    admin = _admin;
     TIMELOCK = _timelock;
 
     // ASK-TEAM: Add event for initialization ?
@@ -94,10 +94,10 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
   }
 
   /// @inheritdoc ITimelockMultiAdminShim
-  function updateGovernor(address _newGovernor) external {
+  function updateAdmin(address _newAdmin) external {
     _revertIfNotTimelock();
-    governor = _newGovernor;
-    emit GovernorUpdated(_newGovernor);
+    admin = _newAdmin;
+    emit AdminUpdated(_newAdmin);
   }
 
   /*///////////////////////////////////////////////////////////////
@@ -108,12 +108,14 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
    * @notice Validates authorization for queueing transactions to the timelock.
    * @param target The address of the contract that the function call targets.
    * @dev Reverts with TimelockMultiAdminShim__Unauthorized if:
-   *      - The target is this contract and the caller is not the governor.
+   *      - The target is this contract and the caller is not the admin or an authorized executor.
    *      - Allows any caller to queue transactions targeting external contracts.
    */
   function _revertIfCannotQueue(address target) internal view {
-    if (target == address(this) && msg.sender != governor) {
-      revert TimelockMultiAdminShim__Unauthorized();
+    if (target == address(this)) {
+      if (msg.sender != admin && !isExecutor[msg.sender]) {
+        revert TimelockMultiAdminShim__Unauthorized();
+      }
     }
   }
 
