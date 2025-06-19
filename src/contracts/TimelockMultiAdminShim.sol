@@ -8,7 +8,6 @@ import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompou
 import {ITimelockMultiAdminShim} from "interfaces/ITimelockMultiAdminShim.sol";
 
 contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
-
   /*///////////////////////////////////////////////////////////////
                             Storage
   //////////////////////////////////////////////////////////////*/
@@ -32,10 +31,13 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
    * @param _timelock The address of the Compound Timelock contract.
    */
   constructor(address _governor, ICompoundTimelock _timelock) {
-
     // Validate inputs
-    if (_governor == address(0)) revert TimelockMultiAdminShim__InvalidGovernor();
-    if (address(_timelock) == address(0)) revert TimelockMultiAdminShim__InvalidTimelock();
+    if (_governor == address(0)) {
+      revert TimelockMultiAdminShim__InvalidGovernor();
+    }
+    if (address(_timelock) == address(0)) {
+      revert TimelockMultiAdminShim__InvalidTimelock();
+    }
 
     // Initialize storage
     governor = _governor;
@@ -49,18 +51,27 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
   //////////////////////////////////////////////////////////////*/
 
   /// @inheritdoc ITimelockMultiAdminShim
-  function queueTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta ) public returns (bytes32) {
+  function queueTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
+    public
+    returns (bytes32)
+  {
     _revertIfCannotQueue(target);
     return TIMELOCK.queueTransaction(target, value, signature, data, eta);
   }
 
   /// @inheritdoc ITimelockMultiAdminShim
-  function cancelTransaction(address target, uint value, string memory signature, bytes memory data, uint eta) public {
+  function cancelTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
+    public
+  {
     TIMELOCK.cancelTransaction(target, value, signature, data, eta);
   }
 
   /// @inheritdoc ITimelockMultiAdminShim
-  function executeTransaction(address target, uint value, string memory signature, bytes memory data, uint eta) public payable returns (bytes memory) {
+  function executeTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
+    public
+    payable
+    returns (bytes memory)
+  {
     return TIMELOCK.executeTransaction(target, value, signature, data, eta);
   }
 
@@ -69,21 +80,21 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
   //////////////////////////////////////////////////////////////*/
 
   /// @inheritdoc ITimelockMultiAdminShim
-  function addExecutor(address _newExecutor) public {
+  function addExecutor(address _newExecutor) external {
     _revertIfNotTimelock();
     isExecutor[_newExecutor] = true;
     emit ExecutorAdded(_newExecutor);
   }
 
   /// @inheritdoc ITimelockMultiAdminShim
-  function removeExecutor(address _executor) public {
+  function removeExecutor(address _executor) external {
     _revertIfNotTimelock();
     isExecutor[_executor] = false;
     emit ExecutorRemoved(_executor);
   }
 
   /// @inheritdoc ITimelockMultiAdminShim
-  function updateGovernor(address _newGovernor) public {
+  function updateGovernor(address _newGovernor) external {
     _revertIfNotTimelock();
     governor = _newGovernor;
     emit GovernorUpdated(_newGovernor);
@@ -115,7 +126,6 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     }
   }
 }
-
 
 /*///////////////////////////////////////////////////////////////
                       Team Notes

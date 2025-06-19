@@ -31,4 +31,4 @@
   wrap_comments = true
 
 [profile.docs]
-src = 'src/interfaces/'
+  src = 'src/interfaces/'

@@ -10,7 +10,7 @@ import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompou
  * @notice Interface for a Timelock shim that supports multiple executors and a mutable governor.
  * @dev This interface defines functions and events for managing a timelock with multiple authorized executors,
  *      a changeable governor, and secure queuing, cancelling, and execution of transactions via a timelock.
- *      
+ *
  *      Security Model:
  *      - Anyone can queue transactions targeting external contracts
  *      - Only the governor can queue transactions targeting this shim (addExecutor, removeExecutor, updateGovernor)
@@ -19,7 +19,6 @@ import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompou
  *      - This creates a two-step process: governor queues → timelock executes after delay
  */
 interface ITimelockMultiAdminShim {
-
   /*///////////////////////////////////////////////////////////////
                           Errors
   //////////////////////////////////////////////////////////////*/
@@ -59,16 +58,10 @@ interface ITimelockMultiAdminShim {
                       Public Storage Variables
   //////////////////////////////////////////////////////////////*/
 
-  /**
-   * @notice The address of the governor.
-   * @return The address of the governor.
-   */
+  /// @notice The address of the governor.
   function governor() external view returns (address);
 
-  /**
-   * @notice The address of the timelock.
-   * @return The address of the timelock.
-   */
+  /// @notice The timelock contract.
   function TIMELOCK() external view returns (ICompoundTimelock);
 
   /**
@@ -81,7 +74,7 @@ interface ITimelockMultiAdminShim {
   /*///////////////////////////////////////////////////////////////
                     Proxy Timelock Functions 
   //////////////////////////////////////////////////////////////*/
-  
+
   /**
    * @notice Queues a transaction to the timelock.
    * @param target The address of the contract to call.
@@ -91,8 +84,10 @@ interface ITimelockMultiAdminShim {
    * @param eta The eta of the transaction.
    * @return The hash of the queued transaction.
    */
-  function queueTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta ) external returns (bytes32);
-  
+  function queueTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
+    external
+    returns (bytes32);
+
   /**
    * @notice Cancels a transaction on the timelock.
    * @param target The address of the contract to call.
@@ -101,8 +96,9 @@ interface ITimelockMultiAdminShim {
    * @param data The data to send with the transaction.
    * @param eta The eta of the transaction.
    */
-  function cancelTransaction(address target, uint value, string memory signature, bytes memory data, uint eta) external;
-  
+  function cancelTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
+    external;
+
   /**
    * @notice Executes a transaction on the timelock.
    * @param target The address of the contract to call.
@@ -111,25 +107,28 @@ interface ITimelockMultiAdminShim {
    * @param data The data to send with the transaction.
    * @param eta The eta of the transaction.
    * @return The data returned by the transaction.
-  */
-  function executeTransaction(address target, uint value, string memory signature, bytes memory data, uint eta) external payable returns (bytes memory);
-  
+   */
+  function executeTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
+    external
+    payable
+    returns (bytes memory);
+
   /*///////////////////////////////////////////////////////////////
                      External Functions 
   //////////////////////////////////////////////////////////////*/
-  
+
   /**
    * @notice Adds an executor to the timelock.
    * @param _newExecutor The address of the new executor.
    */
   function addExecutor(address _newExecutor) external;
-  
+
   /**
    * @notice Removes an executor from the timelock.
    * @param _executor The address of the executor to remove.
    */
   function removeExecutor(address _executor) external;
-  
+
   /**
    * @notice Updates the governor.
    * @param _newGovernor The address of the new governor.
