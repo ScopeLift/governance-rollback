@@ -29,8 +29,10 @@ TimelockMultiAdminShim::cancelTransaction
 
 
 TimelockMultiAdminShim::executeTransaction
-└── when called
-    └── it should forward the call to timelock
+├── when caller is admin
+│   └── it should forward the call to timelock
+└── when caller is not admin
+    └── it should revert // with TimelockMultiAdminShim__Unauthorized
 
 
 TimelockMultiAdminShim::addExecutor

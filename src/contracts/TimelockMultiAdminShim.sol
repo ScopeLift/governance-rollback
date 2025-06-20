@@ -7,18 +7,75 @@ import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompou
 // Internal Imports
 import {ITimelockMultiAdminShim} from "interfaces/ITimelockMultiAdminShim.sol";
 
+/**
+ * @title ITimelockMultiAdminShim
+ * @author [ScopeLift](https://scopelift.co)
+ * @notice Interface for a Timelock shim that supports multiple executors and a mutable admin.
+ * @dev This interface defines functions and events for managing a timelock with multiple authorized executors,
+ *      a changeable admin, and secure queuing, cancelling, and execution of transactions via a timelock.
+ *
+ *      Security Model:
+ *      - Anyone can queue transactions targeting external contracts
+ *      - Only the admin or an executor can queue transactions targeting this shim
+ *      - All shim configuration changes must go through the timelock (with delay)
+ *      - The timelock is the only entity that can execute changes to the shim
+ *      - This creates a two-step process: admin queues → timelock executes after delay
+ */
 contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
+
+  /*///////////////////////////////////////////////////////////////
+                          Errors
+  //////////////////////////////////////////////////////////////*/
+
+  /// @notice Emitted when an unauthorized caller attempts to queue a transaction.
+  error TimelockMultiAdminShim__Unauthorized();
+
+  /// @notice Emitted when an invalid admin address is provided.
+  error TimelockMultiAdminShim__InvalidAdmin();
+
+  /// @notice Emitted when an invalid timelock address is provided.
+  error TimelockMultiAdminShim__InvalidTimelock();
+
+  /*///////////////////////////////////////////////////////////////
+                          Events
+  //////////////////////////////////////////////////////////////*/
+
+  /**
+   * @notice Emitted when a new executor is added.
+   * @param executor The address of the new executor.
+   */
+  event ExecutorAdded(address indexed executor);
+
+  /**
+   * @notice Emitted when an executor is removed.
+   * @param executor The address of the removed executor.
+   */
+  event ExecutorRemoved(address indexed executor);
+
+  /**
+   * @notice Emitted when the admin is updated.
+   * @param previousAdmin The address of the previous admin.
+   * @param newAdmin The address of the new admin.
+   */
+  event AdminUpdated(address indexed previousAdmin, address indexed newAdmin);
+
+  /**
+   * @notice Emitted when the timelock is updated.
+   * @param timelock The address of the timelock.
+   */
+  event TimelockSet(address indexed timelock);
+
   /*///////////////////////////////////////////////////////////////
                             Storage
   //////////////////////////////////////////////////////////////*/
 
-  /// @inheritdoc ITimelockMultiAdminShim
+  /// @notice The address of the admin.
   address public admin;
 
-  /// @inheritdoc ITimelockMultiAdminShim
+  /// @notice The timelock contract.
   ICompoundTimelock public immutable TIMELOCK;
 
-  /// @inheritdoc ITimelockMultiAdminShim
+  /// @notice Tracks which addresses are authorized to execute queue and execute transactions.
   mapping(address => bool) public isExecutor;
 
   /*///////////////////////////////////////////////////////////////
@@ -31,26 +88,61 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
    * @param _timelock The address of the Compound Timelock contract.
    */
   constructor(address _admin, ICompoundTimelock _timelock) {
-    // Validate inputs
-    if (_admin == address(0)) {
-      revert TimelockMultiAdminShim__InvalidAdmin();
-    }
     if (address(_timelock) == address(0)) {
       revert TimelockMultiAdminShim__InvalidTimelock();
     }
-
-    // Initialize storage
-    admin = _admin;
     TIMELOCK = _timelock;
+    emit TimelockSet(address(_timelock));
+    
+    _setAdmin(_admin);
+  }
 
-    // ASK-TEAM: Add event for initialization ?
+  /*///////////////////////////////////////////////////////////////
+                      External Functions
+  //////////////////////////////////////////////////////////////*/
+
+  /**
+   * @notice Adds an executor to the timelock.
+   * @param _newExecutor The address of the new executor.
+   */
+  function addExecutor(address _newExecutor) external {
+    _revertIfNotTimelock();
+    isExecutor[_newExecutor] = true;
+    emit ExecutorAdded(_newExecutor);
+  }
+
+  /**
+   * @notice Removes an executor from the timelock.
+   * @param _executor The address of the executor to remove.
+   */
+  function removeExecutor(address _executor) external {
+    _revertIfNotTimelock();
+    isExecutor[_executor] = false;
+    emit ExecutorRemoved(_executor);
+  }
+
+  /**
+   * @notice Updates the admin.
+   * @param _newAdmin The address of the new admin.
+   */
+  function updateAdmin(address _newAdmin) external {
+    _revertIfNotTimelock();
+    _setAdmin(_newAdmin);
   }
 
   /*///////////////////////////////////////////////////////////////
                     Proxy Timelock Functions 
   //////////////////////////////////////////////////////////////*/
 
-  /// @inheritdoc ITimelockMultiAdminShim
+  /**
+   * @notice Queues a transaction to the timelock.
+   * @param target The address of the contract to call.
+   * @param value The value to send with the transaction.
+   * @param signature The function signature to call.
+   * @param data The data to send with the transaction.
+   * @param eta The eta of the transaction.
+   * @return The hash of the queued transaction.
+   */
   function queueTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
     public
     returns (bytes32)
@@ -59,46 +151,38 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     return TIMELOCK.queueTransaction(target, value, signature, data, eta);
   }
 
-  /// @inheritdoc ITimelockMultiAdminShim
+  /**
+   * @notice Cancels a transaction on the timelock.
+   * @param target The address of the contract to call.
+   * @param value The value to send with the transaction.
+   * @param signature The function signature to call.
+   * @param data The data to send with the transaction.
+   * @param eta The eta of the transaction.
+   */
   function cancelTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
     public
   {
     TIMELOCK.cancelTransaction(target, value, signature, data, eta);
   }
 
-  /// @inheritdoc ITimelockMultiAdminShim
+  /**
+   * @notice Executes a transaction on the timelock.
+   * @param target The address of the contract to call.
+   * @param value The value to send with the transaction.
+   * @param signature The function signature to call.
+   * @param data The data to send with the transaction.
+   * @param eta The eta of the transaction.
+   * @return The data returned by the transaction.
+   */
   function executeTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
     public
     payable
     returns (bytes memory)
   {
+    _revertIfNotAdmin();
     return TIMELOCK.executeTransaction(target, value, signature, data, eta);
   }
 
-  /*///////////////////////////////////////////////////////////////
-                      External Functions
-  //////////////////////////////////////////////////////////////*/
-
-  /// @inheritdoc ITimelockMultiAdminShim
-  function addExecutor(address _newExecutor) external {
-    _revertIfNotTimelock();
-    isExecutor[_newExecutor] = true;
-    emit ExecutorAdded(_newExecutor);
-  }
-
-  /// @inheritdoc ITimelockMultiAdminShim
-  function removeExecutor(address _executor) external {
-    _revertIfNotTimelock();
-    isExecutor[_executor] = false;
-    emit ExecutorRemoved(_executor);
-  }
-
-  /// @inheritdoc ITimelockMultiAdminShim
-  function updateAdmin(address _newAdmin) external {
-    _revertIfNotTimelock();
-    admin = _newAdmin;
-    emit AdminUpdated(_newAdmin);
-  }
 
   /*///////////////////////////////////////////////////////////////
                         Internal Functions
@@ -119,14 +203,30 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     }
   }
 
-  /**
-   * @notice Reverts if the caller is not the timelock.
-   */
+  /// @notice Reverts if the caller is not the admin.
+  function _revertIfNotAdmin() internal view {
+    if (msg.sender != admin) {
+      revert TimelockMultiAdminShim__Unauthorized();
+    }
+  }
+
+  /// @notice Reverts if the caller is not the timelock.
   function _revertIfNotTimelock() internal view {
     if (msg.sender != address(TIMELOCK)) {
       revert TimelockMultiAdminShim__Unauthorized();
     }
   }
+
+  /// @notice Utility function to set the admin.
+  function _setAdmin(address _newAdmin) internal {
+    if (_newAdmin == address(0)) {
+      revert TimelockMultiAdminShim__InvalidAdmin();
+    }
+  
+    emit AdminUpdated(admin, _newAdmin);
+    admin = _newAdmin;
+  }
+
 }
 
 /*///////////////////////////////////////////////////////////////
