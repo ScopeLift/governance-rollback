@@ -1,0 +1,78 @@
+pragma solidity 0.8.30;
+
+interface ITimelockable {
+    function queueTransaction(
+        address target,
+        uint256 value,
+        string memory signature,
+        bytes memory data,
+        uint256 eta
+    ) external returns (bytes32);
+
+    function executeTransaction(
+        address target,
+        uint256 value,
+        string memory signature,
+        bytes memory data,
+        uint256 eta
+    ) external payable returns (bytes memory);
+}
+
+contract UpgradeRegressionManager {
+    ITimelockable public executionTarget;
+
+    address adder; // Address that can add things to the URM
+    address guardian; // Address that execute transactions
+
+    uint256 executionWindow;
+
+    mapping (bytes32 rollbackId => uint256 expiration) rollbackExpirations;
+    mapping (bytes32 rollbackId => uint256 eta) pendingRollbackExecutions;
+
+    // TODO: constructor w/ param config
+
+    // Put something into the URM for conditional execution
+    function addToURM(
+        address[] memory _targets,
+        uint256[] memory _values,
+        bytes[] memory _calldatas,
+        string memory _description
+    ) external {
+        if (msg.sender != adder) {
+            revert();
+        }
+
+        bytes32 _rollbackId = keccak256(parmas);
+        rollbackExpirations[_rollbackId] = block.timestamp + executionWindow;
+
+        // emit an event etc....
+    }
+
+    // Put something into the 
+    function enqueueForExecution(
+        address[] memory _targets,
+        uint256[] memory _values,
+        bytes[] memory _calldatas,
+        string memory _description
+    ) external {
+        // Ensure this is the guardian
+        // Calculate the rollback ID
+        // Lookup the expiration window, make sure we're still within it
+        // Iterate through targets and calldatas queueing them to the "Timelockable" executionTarget
+        // Remove from the rollback expirations so it can't be replayed
+        // Add to a queue of expirations pending execution based on the timelock delay
+        pendingRollbackExecutions[_rollbackId] = block.timestamp + executionTarget.delay();
+    }
+
+    function executeRollback(
+        address[] memory _targets,
+        uint256[] memory _values,
+        bytes[] memory _calldatas,
+        string memory _description
+    ) external {
+        // Calculate the rollback ID
+        // Look up in the pending executions and make sure the time is elapsed (not strictly required but probably advisable)
+        // iterate through the targets & calldatas & call executionTarget.executeTransaction()
+        // delete from the pendingRollbacks mapping to prevent replay
+    }
+}
