@@ -22,7 +22,6 @@ import {ITimelockMultiAdminShim} from "interfaces/ITimelockMultiAdminShim.sol";
  *      - This creates a two-step process: admin queues → timelock executes after delay
  */
 contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
-
   /*///////////////////////////////////////////////////////////////
                           Errors
   //////////////////////////////////////////////////////////////*/
@@ -96,7 +95,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     }
     TIMELOCK = _timelock;
     emit TimelockSet(address(_timelock));
-    
+
     _setAdmin(_admin);
   }
 
@@ -189,7 +188,6 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     return TIMELOCK.executeTransaction(target, value, signature, data, eta);
   }
 
-
   /*///////////////////////////////////////////////////////////////
                         Internal Functions
   //////////////////////////////////////////////////////////////*/
@@ -228,7 +226,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     if (_newAdmin == address(0)) {
       revert TimelockMultiAdminShim__InvalidAdmin();
     }
-  
+
     emit AdminUpdated(admin, _newAdmin);
     admin = _newAdmin;
   }

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.30;
 
 interface ITimelockMultiAdminShim {
-
   /*///////////////////////////////////////////////////////////////
                      External Functions 
   //////////////////////////////////////////////////////////////*/
@@ -28,5 +27,4 @@ interface ITimelockMultiAdminShim {
     external
     payable
     returns (bytes memory);
-
 }
