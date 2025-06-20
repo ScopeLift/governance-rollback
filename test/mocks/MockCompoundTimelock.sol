@@ -14,16 +14,17 @@ contract MockCompoundTimelock is ICompoundTimelock {
         string signature;
         bytes data;
         uint256 eta;
+        bool called;
     }
 
     // Storage for tracking the most recent call to each function
-    TimelockTransactionCall public lastQueueTransactionCall;
-    TimelockTransactionCall public lastCancelTransactionCall;
-    TimelockTransactionCall public lastExecuteTransactionCall;
+    TimelockTransactionCall internal _lastQueueTransactionCall;
+    TimelockTransactionCall internal _lastCancelTransactionCall;
+    TimelockTransactionCall internal _lastExecuteTransactionCall;
 
     // Mock return values
     bytes32 public mockQueueTransactionReturn = bytes32(uint256(1));
-    bytes public mockExecuteTransactionReturn = "";
+    bytes public mockExecuteTransactionReturn = bytes('');
 
     // Admin for setting mock return values
     address public admin;
@@ -46,12 +47,13 @@ contract MockCompoundTimelock is ICompoundTimelock {
         uint256 eta
     ) external returns (bytes32) {
         // Track the call parameters
-        lastQueueTransactionCall = TimelockTransactionCall({
+        _lastQueueTransactionCall = TimelockTransactionCall({
             target: target,
             value: value,
             signature: signature,
             data: data,
-            eta: eta
+            eta: eta,
+            called: true
         });
 
         return mockQueueTransactionReturn;
@@ -66,12 +68,13 @@ contract MockCompoundTimelock is ICompoundTimelock {
         uint256 eta
     ) external {
         // Track the call parameters
-        lastCancelTransactionCall = TimelockTransactionCall({
+        _lastCancelTransactionCall = TimelockTransactionCall({
             target: target,
             value: value,
             signature: signature,
             data: data,
-            eta: eta
+            eta: eta,
+            called: true
         });
     }
 
@@ -84,12 +87,13 @@ contract MockCompoundTimelock is ICompoundTimelock {
         uint256 eta
     ) external payable returns (bytes memory) {
         // Track the call parameters
-        lastExecuteTransactionCall = TimelockTransactionCall({
+        _lastExecuteTransactionCall = TimelockTransactionCall({
             target: target,
             value: value,
             signature: signature,
             data: data,
-            eta: eta
+            eta: eta,
+            called: true
         });
 
         return mockExecuteTransactionReturn;
@@ -97,24 +101,39 @@ contract MockCompoundTimelock is ICompoundTimelock {
 
     /// @dev Clear all tracked call data (useful for test cleanup)
     function clearCallHistory() external onlyAdmin {
-        delete lastQueueTransactionCall;
-        delete lastCancelTransactionCall;
-        delete lastExecuteTransactionCall;
+        delete _lastQueueTransactionCall;
+        delete _lastCancelTransactionCall;
+        delete _lastExecuteTransactionCall;
     }
 
     /// @dev Check if queueTransaction was called
     function wasQueueTransactionCalled() external view returns (bool) {
-        return lastQueueTransactionCall.target != address(0);
+        return _lastQueueTransactionCall.called;
     }
 
     /// @dev Check if cancelTransaction was called
     function wasCancelTransactionCalled() external view returns (bool) {
-        return lastCancelTransactionCall.target != address(0);
+        return _lastCancelTransactionCall.called;
     }
 
     /// @dev Check if executeTransaction was called
     function wasExecuteTransactionCalled() external view returns (bool) {
-        return lastExecuteTransactionCall.target != address(0);
+        return _lastExecuteTransactionCall.called;
+    }
+
+    /// @dev Get the last queue transaction call as a struct
+    function lastQueueTransactionCall() external view returns (TimelockTransactionCall memory) {
+        return _lastQueueTransactionCall;
+    }
+
+    /// @dev Get the last cancel transaction call as a struct
+    function lastCancelTransactionCall() external view returns (TimelockTransactionCall memory) {
+        return _lastCancelTransactionCall;
+    }
+
+    /// @dev Get the last execute transaction call as a struct
+    function lastExecuteTransactionCall() external view returns (TimelockTransactionCall memory) {
+        return _lastExecuteTransactionCall;
     }
 
     // Empty implementations for other interface functions

@@ -36,6 +36,9 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
   /// @notice Emitted when an invalid timelock address is provided.
   error TimelockMultiAdminShim__InvalidTimelock();
 
+  /// @notice Emitted when an invalid executor address is provided.
+  error TimelockMultiAdminShim__InvalidExecutor();
+
   /*///////////////////////////////////////////////////////////////
                           Events
   //////////////////////////////////////////////////////////////*/
@@ -107,6 +110,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
    */
   function addExecutor(address _newExecutor) external {
     _revertIfNotTimelock();
+    _revertIfInvalidExecutor(_newExecutor);
     isExecutor[_newExecutor] = true;
     emit ExecutorAdded(_newExecutor);
   }
@@ -117,6 +121,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
    */
   function removeExecutor(address _executor) external {
     _revertIfNotTimelock();
+    _revertIfInvalidExecutor(_executor);
     isExecutor[_executor] = false;
     emit ExecutorRemoved(_executor);
   }
@@ -162,6 +167,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
   function cancelTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
     public
   {
+    _revertIfNotAdmin();
     TIMELOCK.cancelTransaction(target, value, signature, data, eta);
   }
 
@@ -227,6 +233,12 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     admin = _newAdmin;
   }
 
+  /// @notice Reverts if the executor is invalid.
+  function _revertIfInvalidExecutor(address _executor) internal pure {
+    if (_executor == address(0)) {
+      revert TimelockMultiAdminShim__InvalidExecutor();
+    }
+  }
 }
 
 /*///////////////////////////////////////////////////////////////
