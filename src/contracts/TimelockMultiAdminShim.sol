@@ -207,7 +207,16 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     }
   }
 
+  /// @notice Reverts if the executor is invalid.
+  /// @param _executor The address of the executor.
+  function _revertIfInvalidExecutor(address _executor) internal pure {
+    if (_executor == address(0)) {
+      revert TimelockMultiAdminShim__InvalidExecutor();
+    }
+  }
+
   /// @notice Utility function to set the admin.
+  /// @param _newAdmin The new admin.
   function _setAdmin(address _newAdmin) internal {
     if (_newAdmin == address(0)) {
       revert TimelockMultiAdminShim__InvalidAdmin();
@@ -215,12 +224,5 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
 
     emit AdminSet(admin, _newAdmin);
     admin = _newAdmin;
-  }
-
-  /// @notice Reverts if the executor is invalid.
-  function _revertIfInvalidExecutor(address _executor) internal pure {
-    if (_executor == address(0)) {
-      revert TimelockMultiAdminShim__InvalidExecutor();
-    }
   }
 }
