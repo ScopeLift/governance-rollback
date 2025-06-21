@@ -5,9 +5,7 @@ import { ITimelockMultiAdminShim } from "interfaces/ITimelockMultiAdminShim.sol"
 
 contract UpgradeRegressionManager {
 
-    // TODO: Custom interface and rename it to target and more info in natspec 
-    // Add method delay to shim
-    // rename to timelock compatible name
+    // QUESTION: should we use a custom interface for this and rename this to targetContract ? we only use queue and execute  
     ITimelockMultiAdminShim public shim;
 
     // Address that execute transactions which would invoke timelockMultiAdminShim.executeTransaction()
@@ -16,17 +14,18 @@ contract UpgradeRegressionManager {
     // Address that can add things to the timelockMultiAdminShim.enqueueForExecution()
     // this would be CompoundTimelock
     
-    // TODO: honestly we only use QUEUER.delay(), so should this be a custom interface? 
-    // this can be an address now as delay would be a method in the shim/target contract (you can call it admin)
+    // QUESTION: honestly we only use QUEUER.delay(), so should this be a custom interface? 
     ICompoundTimelock public immutable QUEUER; 
 
     // The duration of the execution window (added to block.timestamp)
     uint256 public executionWindowDuration; 
 
-    // Tracks the time before which the rollback can be queued by the guardian
+    // Tracks the time before which the rollback can be queued
+    // QUESTION: Is this right ?
     mapping (uint256 rollbackId => uint256 expiration) rollbackExpirations;
     
-    // Tracks the time after which the rollback can be executed by the guardian
+    // Tracks the time after which the rollback can be executed
+    // QUESTION: Is this right ?
     mapping (uint256 rollbackId => uint256 eta) pendingRollbackExecutions;
 
 
@@ -37,16 +36,6 @@ contract UpgradeRegressionManager {
         ICompoundTimelock _queuer,
         uint256 _executionWindowDuration
     ) {
-        if (_shim == address(0)) {
-          revert UpgradeRegressionManager__InvalidShim();
-        }
-        if (_guardian == address(0)) {
-          revert UpgradeRegressionManager__InvalidGuardian();
-        }
-        if (_queuer == address(0)) {
-          revert UpgradeRegressionManager__InvalidQueuer();
-        }
-
         QUEUER = _queuer; 
         shim = _shim;
         guardian = _guardian;
@@ -95,7 +84,7 @@ contract UpgradeRegressionManager {
         }
 
 
-        // TODO : similar to GovernorTimelockCompoundUpgradeable._queueOperations ? Is this basically calling shim.queueOperation() ?
+        // QUESTION : similar to GovernorTimelockCompoundUpgradeable._queueOperations ? Is this basically calling shim.queueOperation() ?
         // Iterate through targets and calldatas queueing them to the "Timelockable" executionTarget
        
         // Remove from the rollbackExpirations mapping so it can't be replayed
@@ -103,6 +92,7 @@ contract UpgradeRegressionManager {
 
         // Add to a queue of expirations pending execution based on the timelock delay to know after when it can be executed
         pendingRollbackExecutions[_rollbackId] = block.timestamp + QUEUER.delay();
+        // QUESTION: is this logic right ? because once queued -> we want to add the timelock delay to know after what perid can we do the execution
 
         return _rollbackId;
     }
@@ -138,7 +128,7 @@ contract UpgradeRegressionManager {
     ) external {
         // Calculate the rollback ID
         // Check if the rollback is in pendingRollbackExecutions
-        // TODO: When we cancel -> only delete from execution mapping ? 
+        // QUESTION: Should we allow cancelling? and if yes do we remove it from queue mapping or execution mapping ? 
         // If it is, cancel it
         // Delete from pendingRollbackExecutions
         // emit event
@@ -148,18 +138,20 @@ contract UpgradeRegressionManager {
 
     function updateExecutionWindowDuration(uint256 _newDuration) external {
         // can be called by the QUEUER (aka timelock)
-        // TODO: How do restrict only the guardian to call this function ?  Don't care. Just trust the timelock
+        // QUESTION: How do restrict only the guardian to call this function ? 
         // update the executionWindowDuration
         // emit an event
     }
 
     function updateGuardian(address _newGuardian) external {
         // can be called by the QUEUER (aka timelock)
-        // TODO: How do restrict only the guardian to call this function ?  Don't care. Just trust the timelock
+        // QUESTION: How do restrict only the guardian to call this function ? 
         // update the guardian
         // emit an event
         
     }
+
+    // Should we able to change the shim ? 
 
     function getRollbackId(
         address[] memory targets,

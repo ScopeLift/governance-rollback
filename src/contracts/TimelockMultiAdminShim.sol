@@ -201,7 +201,6 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
    */
   function _revertIfCannotQueue(address target) internal view {
     // Question : 
-    // - should we also add a check when target is URM, revert if caller is not URM? if not anyone can propose to updateGuardian ? 
     // - who can invoke queue / execute / cancel ?  is it both executor and admin ? or only executor ? 
     // - Should we also check that the admin cannot be removed as an executor ? and is set as an executor in constructor?
     if (target == address(this)) {
