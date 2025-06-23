@@ -1,6 +1,35 @@
 # Governance Emergency Rollback - Technical Design Document
 
+<<<<<<< HEAD
 > **⚠️ Development Status**: This repository is currently under active development and is **NOT** complete, audited, or ready for production use. The contracts and documentation are provided for research and development purposes only.
+=======
+An opinionated template for [Foundry](https://github.com/foundry-rs/foundry) projects.
+
+_**Please read the full README before using this template.**_
+
+- [ScopeLift Foundry Template](#scopelift-foundry-template)
+  - [Usage](#usage)
+  - [Overview](#overview)
+    - [`foundry.toml`](#foundrytoml)
+    - [CI](#ci)
+    - [Test Structure](#test-structure)
+  - [Configuration](#configuration)
+    - [Coverage](#coverage)
+    - [Slither](#slither)
+    - [GitHub Code Scanning](#github-code-scanning)
+
+## Usage
+
+To use this template, use one of the below approaches:
+
+1. Run `forge init --template ScopeLift/foundry-template` in an empty directory.
+2. Click [here](https://github.com/ScopeLift/foundry-template/generate) to generate a new repository from this template.
+3. Click the "Use this template" button from this repo's [home page](https://github.com/ScopeLift/foundry-template).
+
+It's also recommend to install [scopelint](https://github.com/ScopeLift/scopelint), which is used in CI.
+You can run this locally with `scopelint fmt` and `scopelint check`.
+Note that these are supersets of `forge fmt` and `forge fmt --check`, so you do not need to run those forge commands when using scopelint.
+>>>>>>> e1988cd (feat: add deploy scripts)
 
 ## Overview
 

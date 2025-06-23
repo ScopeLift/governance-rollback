@@ -226,8 +226,8 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
     delete rollbackQueueExpiresAt[_rollbackId];
 
     // Queue the rollback transactions.
-    for (uint256 i = 0; i < _targets.length; i++) {
-      TARGET.queueTransaction(_targets[i], _values[i], "", _calldatas[i], 0);
+    for (uint256 _i = 0; _i < _targets.length; _i++) {
+      TARGET.queueTransaction(_targets[_i], _values[_i], "", _calldatas[_i], 0);
     }
 
     emit RollbackQueued(_rollbackId, _eta);
@@ -262,8 +262,8 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
     delete rollbackExecutableAt[_rollbackId];
 
     // Cancel the rollback transactions.
-    for (uint256 i = 0; i < _targets.length; i++) {
-      TARGET.cancelTransaction(_targets[i], _values[i], "", _calldatas[i], 0);
+    for (uint256 _i = 0; _i < _targets.length; _i++) {
+      TARGET.cancelTransaction(_targets[_i], _values[_i], "", _calldatas[_i], 0);
     }
 
     emit RollbackCanceled(_rollbackId);
@@ -301,8 +301,8 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
     delete rollbackExecutableAt[_rollbackId];
 
     // Execute the rollback.
-    for (uint256 i = 0; i < _targets.length; i++) {
-      TARGET.executeTransaction(_targets[i], _values[i], "", _calldatas[i], 0);
+    for (uint256 _i = 0; _i < _targets.length; _i++) {
+      TARGET.executeTransaction(_targets[_i], _values[_i], "", _calldatas[_i], 0);
     }
 
     emit RollbackExecuted(_rollbackId);

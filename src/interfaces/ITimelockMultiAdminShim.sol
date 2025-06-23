@@ -29,6 +29,12 @@ interface ITimelockMultiAdminShim {
                     Proxy Timelock Functions 
   //////////////////////////////////////////////////////////////*/
 
+  function GRACE_PERIOD() external view returns (uint256);
+
+  function MINIMUM_DELAY() external view returns (uint256);
+
+  function MAXIMUM_DELAY() external view returns (uint256);
+
   function queueTransaction(address _target, uint256 _value, string memory _signature, bytes memory _data, uint256 _eta)
     external
     returns (bytes32);
@@ -50,4 +56,6 @@ interface ITimelockMultiAdminShim {
   ) external payable returns (bytes memory);
 
   function delay() external view returns (uint256);
+
+  function acceptAdmin() external;
 }
