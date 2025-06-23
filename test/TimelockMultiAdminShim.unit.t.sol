@@ -11,12 +11,16 @@ import {MockCompoundTimelock} from "test/mocks/MockCompoundTimelock.sol";
 contract TimelockMultiAdminShimTest is Test {
   TimelockMultiAdminShim public timelockMultiAdminShim;
   address public admin = makeAddr("Admin");
+  address public executor = makeAddr("Executor");
+  address[] public noExecutors = new address[](0);
   MockCompoundTimelock public timelock;
 
   function setUp() external {
     timelock = new MockCompoundTimelock();
+    address[] memory executors = new address[](1);
+    executors[0] = executor;
 
-    timelockMultiAdminShim = new TimelockMultiAdminShim(admin, timelock);
+    timelockMultiAdminShim = new TimelockMultiAdminShim(admin, timelock, executors);
   }
 
   function _assumeSafeAdmin(address _newAdmin) public pure {
@@ -25,6 +29,12 @@ contract TimelockMultiAdminShimTest is Test {
 
   function _assumeSafeExecutor(address _newExecutor) public pure {
     vm.assume(_newExecutor != address(0));
+  }
+
+  function _assumeSafeExecutors(address[] memory _executors) public pure {
+    for (uint256 _i = 0; _i < _executors.length; _i++) {
+      vm.assume(_executors[_i] != address(0));
+    }
   }
 
   function _addExecutor(address _executor) internal {
@@ -40,41 +50,50 @@ contract TimelockMultiAdminShimTest is Test {
 }
 
 contract Constructor is TimelockMultiAdminShimTest {
-  function testFuzz_SetsIntializeParameters(address _admin) external {
+  function testFuzz_SetsInitialParameters(address _admin, address[] memory _executors) external {
     _assumeSafeAdmin(_admin);
+    _assumeSafeExecutors(_executors);
 
-    TimelockMultiAdminShim _shim = new TimelockMultiAdminShim(_admin, timelock);
+    TimelockMultiAdminShim _shim = new TimelockMultiAdminShim(_admin, timelock, _executors);
 
     assertEq(_shim.admin(), _admin);
     assertEq(address(_shim.TIMELOCK()), address(timelock));
+
+    for (uint256 _index = 0; _index < _executors.length; _index++) {
+      assertTrue(_shim.isExecutor(_executors[_index]));
+    }
   }
 
-  function testFuzz_EmitsTimelockSetEvent(address _admin) external {
+  function testFuzz_EmitsTimelockSetEvent(address _admin, address[] memory _executors) external {
     _assumeSafeAdmin(_admin);
+    _assumeSafeExecutors(_executors);
 
-    vm.expectEmit(true, true, true, true);
-    emit TimelockMultiAdminShim.TimelockSet(address(timelock));
-    new TimelockMultiAdminShim(_admin, timelock);
+    for (uint256 _index = 0; _index < _executors.length; _index++) {
+      vm.expectEmit();
+      emit TimelockMultiAdminShim.ExecutorAdded(_executors[_index]);
+    }
+
+    new TimelockMultiAdminShim(_admin, timelock, _executors);
   }
 
   function testFuzz_EmitsAdminSetEvent(address _admin) external {
     _assumeSafeAdmin(_admin);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit TimelockMultiAdminShim.AdminSet(address(0), _admin);
-    new TimelockMultiAdminShim(_admin, timelock);
+    new TimelockMultiAdminShim(_admin, timelock, noExecutors);
   }
 
   function testFuzz_RevertIf_TimelockIsZeroAddress(address _admin) external {
     _assumeSafeAdmin(_admin);
 
     vm.expectRevert(TimelockMultiAdminShim.TimelockMultiAdminShim__InvalidTimelock.selector);
-    new TimelockMultiAdminShim(_admin, MockCompoundTimelock(payable(address(0))));
+    new TimelockMultiAdminShim(_admin, MockCompoundTimelock(payable(address(0))), noExecutors);
   }
 
   function testFuzz_RevertIf_AdminIsZeroAddress() external {
     vm.expectRevert(TimelockMultiAdminShim.TimelockMultiAdminShim__InvalidAdmin.selector);
-    new TimelockMultiAdminShim(address(0), timelock);
+    new TimelockMultiAdminShim(address(0), timelock, noExecutors);
   }
 }
 
@@ -90,7 +109,7 @@ contract AddExecutor is TimelockMultiAdminShimTest {
   function testFuzz_EmitsExecutorAddedEvent(address _executor) external {
     _assumeSafeExecutor(_executor);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit TimelockMultiAdminShim.ExecutorAdded(_executor);
     _addExecutor(_executor);
   }
@@ -101,7 +120,7 @@ contract AddExecutor is TimelockMultiAdminShimTest {
 
     assertTrue(timelockMultiAdminShim.isExecutor(_executor));
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit TimelockMultiAdminShim.ExecutorAdded(_executor);
     _addExecutor(_executor);
 
@@ -137,7 +156,7 @@ contract RemoveExecutor is TimelockMultiAdminShimTest {
     _addExecutor(_executor);
 
     vm.prank(address(timelock));
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit TimelockMultiAdminShim.ExecutorRemoved(_executor);
     timelockMultiAdminShim.removeExecutor(_executor);
   }
@@ -145,7 +164,7 @@ contract RemoveExecutor is TimelockMultiAdminShimTest {
   function testFuzz_EmitsExecutorRemovedEventEvenIfExecutorIsNotAnExecutor(address _executor) external {
     _assumeSafeExecutor(_executor);
     vm.prank(address(timelock));
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit TimelockMultiAdminShim.ExecutorRemoved(_executor);
     timelockMultiAdminShim.removeExecutor(_executor);
   }
@@ -179,7 +198,7 @@ contract SetAdmin is TimelockMultiAdminShimTest {
     _assumeSafeAdmin(_newAdmin);
 
     vm.prank(address(timelock));
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit TimelockMultiAdminShim.AdminSet(admin, _newAdmin);
     timelockMultiAdminShim.setAdmin(_newAdmin);
   }
@@ -195,6 +214,24 @@ contract SetAdmin is TimelockMultiAdminShimTest {
 
     vm.expectRevert(TimelockMultiAdminShim.TimelockMultiAdminShim__Unauthorized.selector);
     timelockMultiAdminShim.setAdmin(_newAdmin);
+  }
+}
+
+contract GRACE_PERIOD is TimelockMultiAdminShimTest {
+  function test_ReturnsGracePeriodSetInTimelock() external view {
+    assertEq(timelockMultiAdminShim.GRACE_PERIOD(), timelock.GRACE_PERIOD());
+  }
+}
+
+contract MINIMUM_DELAY is TimelockMultiAdminShimTest {
+  function test_ReturnsMinimumDelaySetInTimelock() external view {
+    assertEq(timelockMultiAdminShim.MINIMUM_DELAY(), timelock.MINIMUM_DELAY());
+  }
+}
+
+contract MAXIMUM_DELAY is TimelockMultiAdminShimTest {
+  function test_ReturnsMaximumDelaySetInTimelock() external view {
+    assertEq(timelockMultiAdminShim.MAXIMUM_DELAY(), timelock.MAXIMUM_DELAY());
   }
 }
 
@@ -452,6 +489,29 @@ contract ExecuteTransaction is TimelockMultiAdminShimTest {
 contract Delay is TimelockMultiAdminShimTest {
   function test_ReturnsDelaySetInTimelock() external view {
     assertEq(timelockMultiAdminShim.delay(), timelock.delay());
+  }
+}
+
+contract QueuedTransactions is TimelockMultiAdminShimTest {
+  function test_ReturnsQueuedTransactionsSetInTimelock() external view {
+    bytes32 txHash = keccak256(abi.encode(address(0), 0, "", "", 0));
+    assertEq(timelockMultiAdminShim.queuedTransactions(txHash), timelock.queuedTransactions(txHash));
+  }
+}
+
+contract AcceptAdmin is TimelockMultiAdminShimTest {
+  function testFuzz_AcceptsAdminPassesToTimelock(address _newAdmin) external {
+    vm.prank(_newAdmin);
+    timelockMultiAdminShim.acceptAdmin();
+    assertTrue(timelock.lastParam__acceptAdmin__called());
+  }
+}
+
+contract Fallback is TimelockMultiAdminShimTest {
+  function test_CanSendEthToShim() external {
+    // TODO: make this a fuzz test
+    (bool success,) = address(timelockMultiAdminShim).call{value: 0}("");
+    assertTrue(success);
   }
 }
 

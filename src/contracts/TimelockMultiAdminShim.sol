@@ -71,7 +71,8 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
   /// @notice Constructor for the TimelockMultiAdminShim contract.
   /// @param _admin The address of the Admin contract.
   /// @param _timelock The address of the Compound Timelock contract.
-  constructor(address _admin, ICompoundTimelock _timelock) {
+  /// @param _executors The initial list of addresses that will be whitelisted as executors immediately upon deployment.
+  constructor(address _admin, ICompoundTimelock _timelock, address[] memory _executors) {
     if (address(_timelock) == address(0)) {
       revert TimelockMultiAdminShim__InvalidTimelock();
     }
@@ -79,6 +80,10 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     emit TimelockSet(address(_timelock));
 
     _setAdmin(_admin);
+
+    for (uint256 _i = 0; _i < _executors.length; _i++) {
+      _addExecutor(_executors[_i]);
+    }
   }
 
   /*///////////////////////////////////////////////////////////////
@@ -89,9 +94,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
   /// @param _newExecutor The address of the new executor.
   function addExecutor(address _newExecutor) external {
     _revertIfNotTimelock();
-    _revertIfInvalidExecutor(_newExecutor);
-    isExecutor[_newExecutor] = true;
-    emit ExecutorAdded(_newExecutor);
+    _addExecutor(_newExecutor);
   }
 
   /// @notice Removes an executor from the timelock.
@@ -113,6 +116,24 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
   /*///////////////////////////////////////////////////////////////
                     Proxy Timelock Functions 
   //////////////////////////////////////////////////////////////*/
+
+  /// @notice Returns the grace period of the timelock.
+  /// @return The grace period of the timelock.
+  function GRACE_PERIOD() external view returns (uint256) {
+    return TIMELOCK.GRACE_PERIOD();
+  }
+
+  /// @notice Returns the minimum delay of the timelock.
+  /// @return The minimum delay of the timelock.
+  function MINIMUM_DELAY() external view returns (uint256) {
+    return TIMELOCK.MINIMUM_DELAY();
+  }
+
+  /// @notice Returns the maximum delay of the timelock.
+  /// @return The maximum delay of the timelock.
+  function MAXIMUM_DELAY() external view returns (uint256) {
+    return TIMELOCK.MAXIMUM_DELAY();
+  }
 
   /// @notice Queues a transaction to the timelock.
   /// @param _target The address of the contract to call.
@@ -170,6 +191,19 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     return TIMELOCK.delay();
   }
 
+  /// @notice Returns whether a transaction is queued on the timelock.
+  /// @param _txHash The hash of the transaction.
+  /// @return Whether the transaction is queued on the timelock.
+  function queuedTransactions(bytes32 _txHash) external view returns (bool) {
+    return TIMELOCK.queuedTransactions(_txHash);
+  }
+
+  /// @notice Accepts admin role from the timelock on behalf of this contract.
+  /// @dev This is necessary to finalize the admin transfer when this contract is set as `pendingAdmin`.
+  function acceptAdmin() external {
+    TIMELOCK.acceptAdmin();
+  }
+
   /*///////////////////////////////////////////////////////////////
                         Internal Functions
   //////////////////////////////////////////////////////////////*/
@@ -225,4 +259,18 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     emit AdminSet(admin, _newAdmin);
     admin = _newAdmin;
   }
+
+  /// @notice Utility function to add an executor.
+  /// @param _newExecutor The address of the new executor.
+  function _addExecutor(address _newExecutor) internal {
+    _revertIfInvalidExecutor(_newExecutor);
+    isExecutor[_newExecutor] = true;
+    emit ExecutorAdded(_newExecutor);
+  }
+
+  /// @notice Fallback function to accept native transfers from the Governor
+  /// @dev This is required because the Governor sends native to the timelock when executing proposals
+  ///      via Address.sendValue(payable($._timelock), msg.value). Without this fallback, such
+  ///      transfers would revert, preventing proposal execution.
+  fallback() external {}
 }

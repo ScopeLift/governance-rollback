@@ -22,6 +22,8 @@ contract MockCompoundTimelock is ICompoundTimelock {
   TimelockTransactionCall public _lastParam__cancelTransaction__;
   TimelockTransactionCall public _lastParam__executeTransaction__;
 
+  bool public lastParam__acceptAdmin__called;
+
   // Mock return values
   bytes32 public mock__queueTransactionReturn = bytes32(uint256(1));
   bytes public mock__executeTransactionReturn = bytes("");
@@ -165,7 +167,9 @@ contract MockCompoundTimelock is ICompoundTimelock {
 
   function setDelay(uint256) external {}
 
-  function acceptAdmin() external {}
+  function acceptAdmin() external {
+    lastParam__acceptAdmin__called = true;
+  }
 
   function setPendingAdmin(address) external {}
 }

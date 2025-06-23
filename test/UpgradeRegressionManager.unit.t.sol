@@ -81,16 +81,16 @@ contract UpgradeRegressionManagerTest is Test {
     values = new uint256[](2);
     calldatas = new bytes[](2);
 
-    for (uint256 i = 0; i < 2; i++) {
-      targets[i] = _fixedTargets[i];
-      values[i] = _fixedValues[i];
-      calldatas[i] = _fixedCalldatas[i];
+    for (uint256 _i = 0; _i < 2; _i++) {
+      targets[_i] = _fixedTargets[_i];
+      values[_i] = _fixedValues[_i];
+      calldatas[_i] = _fixedCalldatas[_i];
     }
   }
 }
 
 contract Constructor is UpgradeRegressionManagerTest {
-  function testFuzz_SetsIntializeParameters(
+  function testFuzz_SetsInitialParameters(
     address _timelockTarget,
     address _admin,
     address _guardian,
@@ -115,7 +115,7 @@ contract Constructor is UpgradeRegressionManagerTest {
   ) external {
     _rollbackQueueWindow = _assumeSafeInitParams(_timelockTarget, _admin, _guardian, _rollbackQueueWindow);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit UpgradeRegressionManager.RollbackQueueWindowSet(0, _rollbackQueueWindow);
     new UpgradeRegressionManager(ITimelockTarget(_timelockTarget), _admin, _guardian, _rollbackQueueWindow);
   }
@@ -128,7 +128,7 @@ contract Constructor is UpgradeRegressionManagerTest {
   ) external {
     _rollbackQueueWindow = _assumeSafeInitParams(_timelockTarget, _admin, _guardian, _rollbackQueueWindow);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit UpgradeRegressionManager.GuardianSet(address(0), _guardian);
     new UpgradeRegressionManager(ITimelockTarget(_timelockTarget), _admin, _guardian, _rollbackQueueWindow);
   }
@@ -213,7 +213,7 @@ contract Propose is UpgradeRegressionManagerTest {
 
     uint256 _computedRollbackId = upgradeRegressionManager.getRollbackId(_targets, _values, _calldatas, _description);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit UpgradeRegressionManager.RollbackProposed(
       _computedRollbackId, block.timestamp + rollbackQueueWindow, _targets, _values, _calldatas, _description
     );
@@ -390,7 +390,7 @@ contract Queue is UpgradeRegressionManagerTest {
 
     uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit UpgradeRegressionManager.RollbackQueued(_rollbackId, block.timestamp + timelockTarget.delay());
 
     vm.prank(guardian);
@@ -579,7 +579,7 @@ contract Cancel is UpgradeRegressionManagerTest {
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
     uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit UpgradeRegressionManager.RollbackCanceled(_rollbackId);
 
     vm.prank(guardian);
@@ -745,7 +745,7 @@ contract Execute is UpgradeRegressionManagerTest {
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
     uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit UpgradeRegressionManager.RollbackExecuted(_rollbackId);
 
     vm.warp(block.timestamp + timelockTarget.delay());
@@ -989,7 +989,7 @@ contract SetGuardian is UpgradeRegressionManagerTest {
   function testFuzz_EmitsGuardianSet(address _newGuardian) external {
     _assumeSafeGuardian(_newGuardian);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit UpgradeRegressionManager.GuardianSet(guardian, _newGuardian);
     vm.prank(admin);
     upgradeRegressionManager.setGuardian(_newGuardian);
@@ -1024,7 +1024,7 @@ contract SetRollbackQueueWindow is UpgradeRegressionManagerTest {
   function testFuzz_EmitsRollbackQueueWindowSet(uint256 _newRollbackQueueWindow) external {
     _newRollbackQueueWindow = _boundToRealisticRollbackQueueWindow(_newRollbackQueueWindow);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit UpgradeRegressionManager.RollbackQueueWindowSet(rollbackQueueWindow, _newRollbackQueueWindow);
     vm.prank(admin);
     upgradeRegressionManager.setRollbackQueueWindow(_newRollbackQueueWindow);
@@ -1058,7 +1058,7 @@ contract SetAdmin is UpgradeRegressionManagerTest {
   function testFuzz_EmitsAdminSet(address _newAdmin) external {
     _assumeSafeAdmin(_newAdmin);
 
-    vm.expectEmit(true, true, true, true);
+    vm.expectEmit();
     emit UpgradeRegressionManager.AdminSet(admin, _newAdmin);
     vm.prank(admin);
     upgradeRegressionManager.setAdmin(_newAdmin);
