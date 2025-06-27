@@ -39,7 +39,7 @@ contract DeployShimAndURM is Script, BaseLogger, DeployInput {
 
     UpgradeRegressionManager upgradeRegressionManager = new UpgradeRegressionManager(
       ITimelockTarget(address(timelockMultiAdminShim)), // Target is the shim address
-      COMPOUND_GOVERNOR, // admin is the compound governor
+      COMPOUND_TIMELOCK, // admin is the compound timelock
       GUARDIAN, // Address that can queue, cancel and execute rollback
       ROLLBACK_QUEUE_WINDOW // Time window within which a rollback can be queued after it is proposed by admin
     );

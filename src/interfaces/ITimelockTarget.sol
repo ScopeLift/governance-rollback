@@ -17,7 +17,7 @@ interface ITimelockTarget {
   /// @return The tx hash of the queued transaction.
   function queueTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta)
     external
-    returns (bytes memory);
+    returns (bytes32);
 
   /// @notice Cancels a transaction on the timelock.
   /// @param target The address of the contract to call.
