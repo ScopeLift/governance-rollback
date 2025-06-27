@@ -1,159 +1,326 @@
-# ScopeLift Foundry Template
+# Governance Emergency Rollback - Technical Design Document
 
-An opinionated template for [Foundry](https://github.com/foundry-rs/foundry) projects.
-
-_**Please read the full README before using this template.**_
-
-- [Usage](#usage)
-- [Overview](#overview)
-  - [`foundry.toml`](#foundrytoml)
-  - [CI](#ci)
-  - [Test Structure](#test-structure)
-- [Configuration](#configuration)
-  - [Coverage](#coverage)
-  - [Slither](#slither)
-  - [GitHub Code Scanning](#github-code-scanning)
-
-## Usage
-
-To use this template, use one of the below approaches:
-
-1. Run `forge init --template ScopeLift/foundry-template` in an empty directory.
-2. Click [here](https://github.com/ScopeLift/foundry-template/generate) to generate a new repository from this template.
-3. Click the "Use this template" button from this repo's [home page](https://github.com/ScopeLift/foundry-template).
-
-It's also recommend to install [scopelint](https://github.com/ScopeLift/scopelint), which is used in CI.
-You can run this locally with `scopelint fmt` and `scopelint check`.
-Note that these are supersets of `forge fmt` and `forge fmt --check`, so you do not need to run those forge commands when using scopelint.
+> **⚠️ Development Status**: This repository is currently under active development and is **NOT** complete, audited, or ready for production use. The contracts and documentation are provided for research and development purposes only.
 
 ## Overview
 
-This template is designed to be a simple but powerful configuration for Foundry projects, that aims to help you follow Solidity and Foundry [best practices](https://book.getfoundry.sh/tutorials/best-practices)
-Writing secure contracts is hard, so it ships with strict defaults that you can loosen as needed.
+The Governance Emergency Rollback system provides emergency rollback capabilities for executed governance proposals. This system allows DAOs to quickly reverse the effects of a governance proposal that is causing negative consequences to the protocol, whether due to misconfiguration, bugs, or other unexpected issues.
 
-### `foundry.toml`
+Currently, most DAOs operate with a single executor (the Governor) that can execute transactions through a Timelock. For DAOs that have a legacy, [Compound-style](https://github.com/ScopeLift/compound-governance-upgrade/blob/main/contracts/Timelock.sol) Timelock, only one admin executor is even possible.
 
-The `foundry.toml` config file comes with:
+The contracts in this repository aim to solve these problems:
 
-- A `fmt` configuration.
-- `default`, `lite`, and `ci` profiles.
+1. **Single Executor Limitation**: Only the Governor can execute transactions through a legacy Compound-style Timelock, which is used by many well established DAOs.
 
-Both of these can of course be modified.
-The `default` and `ci` profiles use the same solc build settings, which are intended to be the production settings, but the `ci` profile is configured to run deeper fuzz and invariant tests.
-The `lite` profile turns the optimizer off, which is useful for speeding up compilation times during development.
+2. **Long Lifecycle to Undo Governance Proposal Actions**: There is no mechanism for emergency rollback of executed governance proposals. When a recently executed proposal causes harm, the only recourse is to go through the full governance process again, which can take days or weeks. This delay can be catastrophic in emergency situations.
 
-It's recommended to keep the solidity configuration of the `default` and `ci` profiles in sync, to avoid accidentally deploying contracts with suboptimal configuration settings when running `forge script`.
-This means you can change the solc settings in the `default` profile and the `lite` profile, but never for the `ci` profile.
+The TimelockMultiAdminShim addresses the first limitation by enabling multiple executors, while the Upgrade Regression Manager (URM) solves the actual rollback problem by providing emergency rollback capabilities.
 
-Note that the `foundry.toml` file is formatted using [Taplo](https://taplo.tamasfe.dev/) via `scopelint fmt`.
+## Actors
 
-### CI
+### Governance Actors
 
-Robust CI is also included, with a GitHub Actions workflow that does the following:
+1. **Governor** - The governance contract that proposes and executes governance proposals
+2. **Timelock** - The existing legacy Compound-style timelock contract that enforces delays on governance actions
+3. **Proposers** - DAO members who create governance proposals
 
-- Runs tests with the `ci` profile.
-- Verifies contracts are within the [size limit](https://eips.ethereum.org/EIPS/eip-170) of 24576 bytes.
-- Runs `forge coverage` and verifies a minimum coverage threshold is met.
-- Runs `slither`, integrated with GitHub's [code scanning](https://docs.github.com/en/code-security/code-scanning). See the [Configuration](#configuration) section to learn more.
+### URM Actors
 
-The CI also runs [scopelint](https://github.com/ScopeLift/scopelint) to verify formatting and best practices:
+1. **Guardian** - An address granted emergency capabilities for managing rollback transactions, including queuing, cancellation, and execution.
+2. **Admin** - The address responsible for submitting rollback proposals to the URM. In the context of this system, the legacy Compound-style Timelock assumes this role.
+3. **Target Contract** - The contract that is the recipient of rollback transactions, which can be queued, executed, or cancelled. The Shim serves as the target contract in this scenario.
 
-- Checks that Solidity and TOML files have been formatted.
-  - Solidity checks use the `foundry.toml` config.
-  - Currently the TOML formatting cannot be customized.
-- Validates test names follow a convention of `test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w{1,}`. [^naming-convention]
-- Validates constants and immutables are in `ALL_CAPS`.
-- Validates internal functions in `src/` start with a leading underscore.
-- Validates function names and visibility in forge scripts to 1 public `run` method per script. [^script-abi]
+### Shim Actors
 
-Note that the foundry-toolchain GitHub Action will cache RPC responses in CI by default, and it will also update the cache when you update your fork tests.
+1. **Executors** - Addresses authorized to execute and cancel transactions on the legacy Compound-style timelock, a role assumed by the URM in this system, though others could be added in the future by the admin.
+2. **Admin** - The address responsible for managing the shim's configuration, including the management of executors and the proxying of proposals to the timelock on behalf of the executors. This role is fulfilled by the Governor, who possesses the same capabilities as the executors.
+3. **Timelock** - The legacy Compound-style Timelock contract that is wrapped by the shim.
 
-### Test Structure
+### System Components
 
-The test structure is configured to follow recommended [best practices](https://book.getfoundry.sh/tutorials/best-practices).
-It's strongly recommended to read that document, as it covers a range of aspects.
-Consequently, the test structure is as follows:
+1. **TimelockMultiAdminShim** - A contract that enables the management of proposals by multiple executors, including the Governor and URM, for a legacy Compound-style Timelock. It acts as an intermediary between the Governor and the Timelock, as well as between the URM and the Timelock.
+2. **Upgrade Regression Manager (URM)** - The contract responsible for managing the lifecycle of rollback proposals, ensuring their proper execution and oversight.
 
-- The core protocol deploy script is `script/Deploy.sol`.
-  This deploys the contracts and saves their addresses to storage variables.
-- The tests inherit from this deploy script and execute `Deploy.run()` in their `setUp` method.
-  This has the effect of running all tests against your deploy script, giving confidence that your deploy script is correct.
-- Each test contract serves as `describe` block to unit test a function, e.g. `contract Increment` to test the `increment` function.
+## Architecture
 
-## Configuration
+### Before Architecture
 
-After creating a new repository from this template, make sure to set any desired [branch protections](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/about-protected-branches) on your repo.
+#### Original Production Flow (Without Rollback System)
 
-### Coverage
+```mermaid
+sequenceDiagram
+    participant P as Proposer
+    participant G as Governor
+    participant T as Timelock
+    participant C as Target Contracts
 
-The [`ci.yml`](.github/workflows/ci.yml) has `coverage` configured by default, and contains comments explaining how to modify the configuration.
-It uses:
-The [lcov] CLI tool to filter out the `test/` and `script/` folders from the coverage report.
+    %% Initial Proposal
+    P->>G: Propose change
+    Note over G: Voting period begins
+    Note over G: Quorum reached
+    G->>T: Queue for execution
+    Note over T: Timelock delay (days/weeks)
+    T->>C: Execute change
 
-- The [romeovs/lcov-reporter-action](https://github.com/romeovs/lcov-reporter-action) action to post a detailed coverage report to the PR. Subsequent commits on the same branch will automatically delete stale coverage comments and post new ones.
-- The [zgosalvez/github-actions-report-lcov](https://github.com/zgosalvez/github-actions-report-lcov) action to fail coverage if a minimum coverage threshold is not met.
+    Note over C: Bug discovered!
 
-Be aware of foundry's current coverage limitations:
-
-- You cannot filter files/folders from `forge` directly, so `lcov` is used to do this.
-- `forge coverage` always runs with the optimizer off and without via-ir, so if you need either of these to compile you will not be able to run coverage.
-
-Remember not to optimize for coverage, but to optimize for [well thought-out tests](https://book.getfoundry.sh/tutorials/best-practices?highlight=coverage#best-practices-1).
-
-### Slither
-
-In [`ci.yml`](.github/workflows/ci.yml), you'll notice Slither is configured as follows:
-
-```yml
-slither-args: --filter-paths "./lib|./test" --exclude naming-convention,solc-version
+    %% Emergency Fix (Same slow process)
+    P->>G: Propose emergency fix
+    Note over G: Voting period begins
+    Note over G: Quorum reached
+    G->>T: Queue for execution
+    Note over T: Timelock delay (days/weeks)
+    T->>C: Execute emergency fix
 ```
 
-This means Slither is not run on the `lib` or `test` folders, and the [`naming-convention`](https://github.com/crytic/slither/wiki/Detector-Documentation#conformance-to-solidity-naming-conventions) and [solc-version](https://github.com/crytic/slither/wiki/Detector-Documentation#incorrect-versions-of-solidity) checks are disabled.
+**Problems with Current Architecture:**
+- Single executor (only Governor can execute)
+- Rollback requires full governance cycle (days/weeks)
 
-This `slither-args` field is where you can change the Slither configuration for your project, and the defaults above can of course be changed.
 
-Notice that Slither will run against `script/` by default.
-Carefully written and tested scripts are key to ensuring complex deployment and scripting pipelines execute as planned, but you are free to disable Slither checks on the scripts folder if it feels like overkill for your use case.
+### After Architecture
 
-For more information on configuration Slither, see [the documentation](https://github.com/crytic/slither/wiki/Usage). For more information on configuring the slither action, see the [slither-action](https://github.com/crytic/slither-action) repo.
+#### New Production Flow (With Rollback System)
 
-### GitHub Code Scanning
+```mermaid
+sequenceDiagram
+    participant * as User
+    participant G as Governor
+    participant S as Shim
+    participant T as Timelock
+    participant U as URM
+    participant C as Target Contracts
+    participant GN as Guardian
 
-As mentioned, the Slither CI step is integrated with GitHub's [code scanning](https://docs.github.com/en/code-security/code-scanning) feature.
-This means when your jobs execute, you'll see two related checks:
+    %% Initial Proposal with Rollback
+    *->>G: Propose change with rollback
+    Note over G: Voting period begins
+    Note over G: Quorum reached
+    *->>G: Queue Proposal
+    G->>S: Queue Proposal (via Shim)
+    S->>T: Queue Proposal
+    Note over T: Timelock delay (days/weeks)
+    *->>G: Execute Proposal
+    G->>S: Execute Proposal (via Shim)
+    S->>T: Execute Proposal
+    T->>C: Transactions executed
+    T->>U: Propose rollback to URM
 
-1. `CI / slither-analyze`
-2. `Code scanning results / Slither`
+    Note over C: Bug discovered!
 
-The first check is the actual Slither analysis.
-You'll notice in the [`ci.yml`](.github/workflows/ci.yml) file that this check has a configuration of `fail-on: none`.
-This means this step will _never_ fail CI, no matter how many findings there are or what their severity is.
-Instead, this check outputs the findings to a SARIF file[^sarif] to be used in the next check.
+    %% Emergency Rollback (Fast response)
+    Note over GN: Before rollback expiry
+    GN->>U: Guardian queues rollback
+    U->>S: Queue rollback (via Shim)
+    S->>T: Queue rollback
+    Note over GN: After Timelock delay
+    GN->>U: Guardian executes rollback
+    U->>S: Execute rollback (via Shim)
+    S->>T: Execute rollback fix
+    T->>C: Rollback Transactions executed
 
-The second check is the GitHub code scanning check.
-The `slither-analyze` job uploads the SARIF report to GitHub, which is then analyzed by GitHub's code scanning feature in this step.
-This is the check that will fail CI if there are Slither findings.
+    Note over C: Rollback Executed!
+```
 
-By default when you create a repository, only alerts with the severity level of `Error` will cause a pull request check failure, and checks will succeed with alerts of lower severities.
-However, you can [configure](https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#defining-the-severities-causing-pull-request-check-failure) which level of slither results cause PR check failures.
+**Benefits of New Architecture:**
+- Multiple executors can use the Timelock
+- Emergency rollback capability with Guardian
+- Conditional rollback execution within time windows
+- Maintains existing governance security model
+- Backward compatible with existing tooling
+- **Rollbacks are proposed as part of governance proposals via double encoding**
 
-It's recommended to conservatively set the failure level to `Any` to start, and to reduce the failure level if you are unable to sufficiently tune Slither or find it to be too noisy.
 
-Findings are shown directly on the PR, as well as in your repo's "Security" tab, under the "Code scanning" section.
-Alerts that are dismissed are remembered by GitHub, and will not be shown again on future PRs.
+## System Components
 
-Note that code scanning integration [only works](https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/setting-up-code-scanning-for-a-repository) for public repos, or private repos with GitHub Enterprise Cloud and a license for GitHub Advanced Security.
-If you have a private repo and don't want to purchase a license, the best option is probably to:
+### 1. TimelockMultiAdminShim
 
-- Remove the `Upload SARIF file` step from CI.
-- Change the `Run Slither` step to `fail-on` whichever level you like, and remove the `sarif` output.
-- Use [triage mode](https://github.com/crytic/slither/wiki/Usage#triage-mode) locally and commit the resulting `slither.db.json` file, and make sure CI has access to that file.
+* [Shim Interface](src/interfaces/ITimelockMultiAdminShim.sol)
+* [Shim Implementation](src/contracts/TimelockMultiAdminShim.sol)
 
-[^naming-convention]:
-    A rigorous test naming convention is important for ensuring that tests are easy to understand and maintain, while also making filtering much easier.
-    For example, one benefit is filtering out all reverting tests when generating gas reports.
+A shim contract that wraps the existing legacy Compound-style Timelock and adds support for multiple executors while maintaining the same interface
 
-[^script-abi]: Limiting scripts to a single public method makes it easier to understand a script's purpose, and facilitates composability of simple, atomic scripts.
-[^sarif]:
-    [SARIF](https://sarifweb.azurewebsites.net/) (Static Analysis Results Interchange Format) is an industry standard for static analysis results.
-    You can read learn more about SARIF [here](https://github.com/microsoft/sarif-tutorials) and read about GitHub's SARIF support [here](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/sarif-support-for-code-scanning).
+**Key Features:**
+- Implements the same interface as the underlying legacy Compound-style Timelock
+- Allows multiple authorized executors
+- Maintains admin-only access for shim configuration
+- Backward compatible with existing governance tooling
+
+**Security Model:**
+- Only the admin can queue transactions targeting the shim itself
+- Admin and authorized executors can queue transactions targeting external contracts
+- Only the legacy Compound-style Timelock can modify executor permissions
+
+### 2. Upgrade Regression Manager (URM)
+
+* [URM Interface](src/interfaces/IUpgradeRegressionManager.sol)
+* [URM Implementation](src/contracts/UpgradeRegressionManager.sol)
+
+The core contract that manages the lifecycle of rollback proposals.
+
+**Key Features:**
+- Propose rollback transactions with queueing expiration windows
+- Queue rollback transactions for execution
+- Execute or cancel queued rollbacks
+- Guardian-controlled emergency execution
+- Configurable queueing windows
+
+**Security Model:**
+- Only admin can propose rollbacks and manage settings
+- Only guardian and admin can queue/execute/cancel rollbacks
+- Queue windows prevent indefinite rollback availability
+- Respect legacy Compound-style Timelock delays prevent immediate execution
+
+## Rollback Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Proposed: Admin (legacy Compound-style Timelock) proposes rollback when proposal is executed
+    Proposed --> Queued: Guardian queues within expiry window
+    Proposed --> Expired: Queue window expires
+    Queued --> Executed: Guardian executes after delay
+    Queued --> Canceled: Guardian cancels
+    Executed --> [*]
+    Canceled --> [*]
+    Expired --> [*]
+```
+
+### Detailed Lifecycle
+
+1. **Proposal Creation**
+   - Admin (legacy Compound-style Timelock) proposes rollback transactions via `propose()`
+   - Rollback gets unique ID based on transaction parameters
+   - Expiration timestamp set (current time + queue window)
+
+2. **Queue Window**
+   - Guardian can queue rollback within expiration window
+   - If window expires, rollback becomes unqueueable
+   - Guardian calls queue() to move to execution phase
+
+3. **Execution Phase**
+   - Rollback transactions queued in legacy Compound-style Timelock
+   - Guardian can execute after timelock delay
+   - Guardian can cancel before execution
+
+## Deployment Process
+
+1. **Deploy Contracts**
+   Deploy the `TimelockMultiAdminShim` and `UpgradeRegressionManager (URM)`. Add URM as an executor in the Shim.
+
+2. **Governance Proposal**
+   Propose setting the Shim as:
+   * Pending admin of the existing legacy Compound-style Timelock
+   * New timelock for the Governor
+
+3. **Accept Admin**
+   Once the proposal executes, call `acceptAdmin()` on the Shim to complete the transfer.
+
+## Integration with Governance
+
+### Proposal Creation with Rollback
+
+When creating a governance proposal, proposers include rollback transactions using a double-encoding mechanism. The rollback transactions are encoded as parameters to the URM's propose() function, which is then included as a transaction in the governance proposal.
+
+**Example: Fee Management Proposal with Rollback**
+
+Let's say we want to propose setting a fee level to 50, with a rollback that resets it to 0 if needed:
+
+```javascript
+// 1. Proposer creates rollback transaction data
+address[] memory rollbackTargets = [feeManagerContract];
+uint256[] memory rollbackValues = [0];
+bytes[] memory rollbackCalldatas = [abi.encodeWithSignature("setFeeLevel(uint256)", 0)];
+string memory rollbackDescription = "Emergency rollback: Reset fee level to 0";
+
+// 2. Double-encode the rollback data as parameters to URM.propose()
+bytes memory urmProposeCalldata = abi.encodeWithSignature(
+    "propose(address[],uint256[],bytes[],string)",
+    rollbackTargets,
+    rollbackValues,
+    rollbackCalldatas,
+    rollbackDescription
+);
+
+// 3. Include both the main proposal and URM.propose() call in the governance proposal
+address[] memory proposalTargets = [feeManagerContract, address(urm)];
+uint256[] memory proposalValues = [0, 0];
+bytes[] memory proposalCalldatas = [
+    abi.encodeWithSignature("setFeeLevel(uint256)", 50),  // Main proposal: set fee to 50
+    urmProposeCalldata                                     // Rollback proposal: reset fee to 0
+];
+string memory proposalDescription = "Set fee level to 50 with emergency rollback capability";
+```
+
+### Double-Encoding Mechanism
+
+The double-encoding mechanism is used to package rollback transactions inside a governance proposal:
+
+1. **First Encoding**: The actual rollback transactions — including target addresses, values, and calldata — are encoded as inputs to the propose() function of the Upgrade Regression Manager (URM).
+2. **Second Encoding**: The URM propose() call itself is then encoded as a transaction within the broader governance proposal submitted to the Governor.
+
+This approach ensures that if a rollback needs to be queued or executed, it follows the same lifecycle and governance protections as a regular proposal once it's in the queue.
+
+
+### Emergency Execution
+
+If an emergency rollback is required after a proposal has already been executed, the guardian initiates the rollback process by queuing the corresponding transactions through the Upgrade Regression Manager (URM). This action schedules the rollback for execution.
+
+Once the configured legacy Compound-style Timelock delay has passed, the guardian can then execute the rollback. This effectively reverses the changes introduced by the original proposal, mitigating any negative impact it may have caused.
+
+
+## Conclusion
+
+The Governance Emergency Rollback system provides a secure, flexible, and backward-compatible solution for emergency rollback scenarios. By leveraging existing governance infrastructure and adding targeted emergency capabilities, the system maintains security while enabling rapid response to critical issues.
+
+The architecture follows established patterns from OpenZeppelin Governor, ensuring consistency and familiarity for developers and auditors. The modular design allows for future enhancements while maintaining the core security model.
+
+## Development
+
+These contracts were built and tested with care by the team at [ScopeLift](https://scopelift.co).
+
+### Build and test
+
+This project uses [Foundry](https://github.com/foundry-rs/foundry). Follow [these instructions](https://github.com/foundry-rs/foundry#installation) to install it.
+
+Clone the repo.
+
+Set up your .env file
+
+```bash
+cp .env.template .env
+# edit the .env to fill in values
+```
+
+Install dependencies & run tests.
+
+```bash
+forge install
+forge build
+forge test
+```
+
+### Spec and lint
+
+This project uses [scopelint](https://github.com/ScopeLift/scopelint) for linting and spec generation. Follow [these instructions](https://github.com/ScopeLift/scopelint?tab=readme-ov-file#installation) to install it.
+
+To use scopelint's linting functionality, run:
+
+```bash
+scopelint check # check formatting
+scopelint fmt # apply formatting changes
+```
+
+To use scopelint's spec generation functionality, run:
+
+```bash
+scopelint spec
+```
+
+This command will use the names of the contract's unit tests to generate a human readable spec. It will list each contract, its constituent functions, and the human readable description of functionality each unit test aims to assert.
+
+
+## License
+
+The code in this repository is licensed under the [MIT](LICENSE.txt) unless otherwise indicated.
+
+Copyright (C) 2025 ScopeLift
