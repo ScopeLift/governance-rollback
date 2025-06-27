@@ -354,13 +354,13 @@ contract Queue is UpgradeRegressionManagerTest {
     assertEq(_lastQueueTransactionCalls[0].value, _values[0]);
     assertEq(_lastQueueTransactionCalls[0].signature, "");
     assertEq(_lastQueueTransactionCalls[0].data, _calldatas[0]);
-    assertEq(_lastQueueTransactionCalls[0].eta, 0);
+    assertEq(_lastQueueTransactionCalls[0].eta, block.timestamp + timelockTarget.delay());
 
     assertEq(_lastQueueTransactionCalls[1].target, _targets[1]);
     assertEq(_lastQueueTransactionCalls[1].value, _values[1]);
     assertEq(_lastQueueTransactionCalls[1].signature, "");
     assertEq(_lastQueueTransactionCalls[1].data, _calldatas[1]);
-    assertEq(_lastQueueTransactionCalls[1].eta, 0);
+    assertEq(_lastQueueTransactionCalls[1].eta, block.timestamp + timelockTarget.delay());
   }
 
   function testFuzz_SetsTheExecutableTimeToAfterTimelockTargetDelay(
@@ -560,13 +560,13 @@ contract Cancel is UpgradeRegressionManagerTest {
     assertEq(_lastCancelTransactionCalls[0].value, _values[0]);
     assertEq(_lastCancelTransactionCalls[0].signature, "");
     assertEq(_lastCancelTransactionCalls[0].data, _calldatas[0]);
-    assertEq(_lastCancelTransactionCalls[0].eta, 0);
+    assertEq(_lastCancelTransactionCalls[0].eta, block.timestamp + timelockTarget.delay());
 
     assertEq(_lastCancelTransactionCalls[1].target, _targets[1]);
     assertEq(_lastCancelTransactionCalls[1].value, _values[1]);
     assertEq(_lastCancelTransactionCalls[1].signature, "");
     assertEq(_lastCancelTransactionCalls[1].data, _calldatas[1]);
-    assertEq(_lastCancelTransactionCalls[1].eta, 0);
+    assertEq(_lastCancelTransactionCalls[1].eta, block.timestamp + timelockTarget.delay());
   }
 
   function testFuzz_EmitsRollbackCanceled(
@@ -713,7 +713,9 @@ contract Execute is UpgradeRegressionManagerTest {
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
     _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
-    vm.warp(block.timestamp + timelockTarget.delay());
+    uint256 _eta = block.timestamp + timelockTarget.delay();
+
+    vm.warp(_eta);
     vm.prank(guardian);
     upgradeRegressionManager.execute(_targets, _values, _calldatas, _description);
 
@@ -726,13 +728,13 @@ contract Execute is UpgradeRegressionManagerTest {
     assertEq(_lastExecuteTransactionCalls[0].value, _values[0]);
     assertEq(_lastExecuteTransactionCalls[0].signature, "");
     assertEq(_lastExecuteTransactionCalls[0].data, _calldatas[0]);
-    assertEq(_lastExecuteTransactionCalls[0].eta, 0);
+    assertEq(_lastExecuteTransactionCalls[0].eta, _eta);
 
     assertEq(_lastExecuteTransactionCalls[1].target, _targets[1]);
     assertEq(_lastExecuteTransactionCalls[1].value, _values[1]);
     assertEq(_lastExecuteTransactionCalls[1].signature, "");
     assertEq(_lastExecuteTransactionCalls[1].data, _calldatas[1]);
-    assertEq(_lastExecuteTransactionCalls[1].eta, 0);
+    assertEq(_lastExecuteTransactionCalls[1].eta, _eta);
   }
 
   function testFuzz_EmitsRollbackExecuted(

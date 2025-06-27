@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {ITimelockTarget} from "../../src/interfaces/ITimelockTarget.sol";
+import {ITimelockTarget} from "src/interfaces/ITimelockTarget.sol";
 
 contract MockTimelockTarget is ITimelockTarget {
   // Struct for tracking function call parameters
@@ -25,14 +25,14 @@ contract MockTimelockTarget is ITimelockTarget {
   /// @dev Mock implementation that tracks parameters and returns mock value
   function queueTransaction(address target, uint256 value, string calldata signature, bytes calldata data, uint256 eta)
     external
-    returns (bytes memory)
+    returns (bytes32)
   {
     // Track the call parameters
     _lastParam__queueTransactions__.push(
       TimelockTransactionCall({target: target, value: value, signature: signature, data: data, eta: eta, called: true})
     );
 
-    return abi.encode(_lastParam__queueTransactions__.length);
+    return bytes32(uint256(_lastParam__queueTransactions__.length));
   }
 
   /// @dev Mock implementation that tracks parameters

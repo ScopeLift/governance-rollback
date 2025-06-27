@@ -113,7 +113,7 @@ contract CompoundGovernorHelper is Test, DeployInput {
     return majorDelegates[vm.randomUint(0, majorDelegates.length - 1)];
   }
 
-  function _setWhitelistedProposer(address _proposer) public {
+  function setWhitelistedProposer(address _proposer) public {
     vm.prank(whitelistGuardian);
     governor.setWhitelistAccountExpiration(_proposer, block.timestamp + 2_000_000);
   }
@@ -208,7 +208,7 @@ contract CompoundGovernorHelper is Test, DeployInput {
     return _proposalId;
   }
 
-  function _submitPassQueueAndExecuteProposal(address _proposer, Proposal memory _proposal) public returns (uint256) {
+  function submitPassQueueAndExecuteProposal(address _proposer, Proposal memory _proposal) public returns (uint256) {
     uint256 _proposalId = _submitProposal(_proposer, _proposal);
     _passQueueAndExecuteProposal(_proposal, _proposalId);
     return _proposalId;

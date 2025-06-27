@@ -45,7 +45,7 @@ contract DeployScriptsIntegrationTest is Test, DeployInput {
 
     // Set the proposer
     proposer = governorHelper.getMajorDelegate(0);
-    governorHelper._setWhitelistedProposer(proposer);
+    governorHelper.setWhitelistedProposer(proposer);
   }
 
   /*///////////////////////////////////////////////////////////////
@@ -57,6 +57,17 @@ contract DeployScriptsIntegrationTest is Test, DeployInput {
     // Since these are not constants in DeployInput, we can update them directly
     TIMELOCK_MULTI_ADMIN_SHIM = address(timelockMultiAdminShim);
     UPGRADE_REGRESSION_MANAGER = address(upgradeRegressionManager);
+  }
+
+  function runDeployScriptsForIntegrationTest()
+    external
+    returns (address, UpgradeRegressionManager, CompoundGovernorHelper, address)
+  {
+    setUp();
+    _step1_deployShimAndURM();
+    _step2__proposeTransferTimelockAdminToShim(TIMELOCK_MULTI_ADMIN_SHIM);
+    _step3_acceptAdminFromShim(TIMELOCK_MULTI_ADMIN_SHIM);
+    return (address(timelockMultiAdminShim), upgradeRegressionManager, governorHelper, proposer);
   }
 
   /*///////////////////////////////////////////////////////////////
@@ -85,7 +96,7 @@ contract DeployScriptsIntegrationTest is Test, DeployInput {
     CompoundGovernorHelper.Proposal memory proposal =
       CompoundGovernorHelper.Proposal(targets, values, calldatas, description);
 
-    governorHelper._submitPassQueueAndExecuteProposal(proposer, proposal);
+    governorHelper.submitPassQueueAndExecuteProposal(proposer, proposal);
   }
 
   function _step3_acceptAdminFromShim(address _timelockMultiAdminShim) internal {
@@ -104,7 +115,7 @@ contract DeployScriptsIntegrationTest is Test, DeployInput {
     assertEq(timelockMultiAdminShim.admin(), COMPOUND_GOVERNOR);
     assertTrue(timelockMultiAdminShim.isExecutor(address(upgradeRegressionManager)));
     assertEq(address(upgradeRegressionManager.TARGET()), address(timelockMultiAdminShim));
-    assertEq(upgradeRegressionManager.admin(), COMPOUND_GOVERNOR);
+    assertEq(upgradeRegressionManager.admin(), COMPOUND_TIMELOCK);
     assertEq(upgradeRegressionManager.guardian(), GUARDIAN);
     assertEq(upgradeRegressionManager.rollbackQueueWindow(), ROLLBACK_QUEUE_WINDOW);
 
