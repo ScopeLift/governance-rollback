@@ -347,6 +347,21 @@ abstract contract URMCore is IURM {
     _setAdmin(_newAdmin);
   }
 
+  /// @notice Returns the current state of a proposed rollback.
+  /// @param _rollbackId The rollback id to check.
+  function state(uint256 _rollbackId) external view returns (IGovernor.ProposalState) {
+    return _getState(_rollbackId);
+  }
+
+  /// @notice Returns whether a rollback is executable.
+  /// @param _rollbackId The rollback id to check.
+  function isRollbackExecutable(uint256 _rollbackId) external view returns (bool) {
+    if (_getState(_rollbackId) != IGovernor.ProposalState.Queued) {
+      return false;
+    }
+    return block.timestamp >= rollbacks[_rollbackId].executableAt;
+  }
+
   /*///////////////////////////////////////////////////////////////
                           Public Functions
   //////////////////////////////////////////////////////////////*/
@@ -365,12 +380,6 @@ abstract contract URMCore is IURM {
     bytes[] memory _calldatas,
     string memory _description
   ) public view virtual returns (uint256);
-
-  /// @notice Returns the current state of a proposed rollback by its ID.
-  /// @param _rollbackId The ID of the rollback to check.
-  function state(uint256 _rollbackId) external view returns (IGovernor.ProposalState) {
-    return _getState(_rollbackId);
-  }
 
   /*///////////////////////////////////////////////////////////////
                         Internal Functions
