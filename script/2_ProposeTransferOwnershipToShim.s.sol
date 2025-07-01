@@ -39,7 +39,7 @@ contract ProposeTransferOwnershipToShim is Script, BaseLogger, DeployInput {
 
   function generateProposal(address timelockMultiAdminShim)
     public
-    pure
+    view
     returns (address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description)
   {
     targets = new address[](2);
@@ -54,7 +54,6 @@ contract ProposeTransferOwnershipToShim is Script, BaseLogger, DeployInput {
     targets[1] = address(COMPOUND_GOVERNOR);
     calldatas[1] = abi.encodeWithSelector(Timelock.updateTimelock.selector, timelockMultiAdminShim);
 
-    description =
-      "Set TimelockMultiAdminShim as pending owner of CompoundTimelock and set TimelockMultiAdminShim as the timelock of the CompoundGovernor";
+    description = vm.readFile("script/helpers/CompoundProposalDescription.md");
   }
 }
