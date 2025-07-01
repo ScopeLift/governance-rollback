@@ -1,5 +1,8 @@
 [profile.default]
   evm_version = "cancun"
+  fs_permissions = [
+    { access = "read", path = "./script/helpers/CompoundProposalDescription.md" },
+  ]
   optimizer = true
   optimizer_runs = 10_000_000
   solc_version = "0.8.30"
