@@ -469,6 +469,22 @@ contract ExecuteTransaction is TimelockMultiAdminShimTest {
     assertEq(timelockTxnCall.eta, _eta);
   }
 
+  function testFuzz_CanCallExecuteTransactionWithValue(
+    address _target,
+    uint256 _value,
+    string memory _signature,
+    bytes memory _data,
+    uint256 _eta
+  ) external {
+    _value = bound(_value, 0, 10 ether);
+    vm.deal(admin, _value);
+    vm.prank(admin);
+
+    timelockMultiAdminShim.executeTransaction{value: _value}(_target, _value, _signature, _data, _eta);
+
+    assertEq(address(timelockMultiAdminShim).balance, _value);
+  }
+
   function testFuzz_RevertIf_CallerIsNotAdminOrExecutor(
     address _caller,
     address _target,
@@ -508,9 +524,8 @@ contract AcceptAdmin is TimelockMultiAdminShimTest {
 }
 
 contract Fallback is TimelockMultiAdminShimTest {
-  function test_CanSendEthToShim() external {
-    // TODO: make this a fuzz test
-    (bool success,) = address(timelockMultiAdminShim).call{value: 0}("");
+  function test_FallbackFunctionalityForUnknownCalls() external {
+    (bool success,) = address(timelockMultiAdminShim).call(abi.encodeWithSignature("randomFunction()"));
     assertTrue(success);
   }
 }
