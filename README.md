@@ -318,6 +318,38 @@ scopelint spec
 
 This command will use the names of the contract's unit tests to generate a human readable spec. It will list each contract, its constituent functions, and the human readable description of functionality each unit test aims to assert.
 
+### Commit linting (optional)
+
+This project includes [commitlint](https://commitlint.js.org/) configuration to enforce conventional commit format. The configuration extends `@commitlint/config-conventional` which enforces the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+
+To enable commit linting in your development workflow:
+
+1. **Install dependencies** (if not already installed):
+   ```bash
+   pnpm install
+   ```
+
+2. **Set up the pre-commit hook** (already configured in package.json):
+   ```bash
+   pnpm run prepare
+   ```
+
+3. **Use conventional commit format** for your commits:
+   ```bash
+   git commit -m "feat: add new rollback functionality"
+   git commit -m "fix: resolve invariant test failure"
+   git commit -m "docs: update README with commit linting info"
+   ```
+
+Common commit types include:
+- `feat`: New features
+- `fix`: Bug fixes
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code refactoring
+- `test`: Adding or updating tests
+- `chore`: Maintenance tasks
+
 
 ## License
 
