@@ -12,6 +12,7 @@ import {FakeProtocolRollbackTestHelper} from "test/fakes/FakeProtocolRollbackTes
 import {UpgradeRegressionManager} from "src/contracts/UpgradeRegressionManager.sol";
 import {DeployInput} from "script/DeployInput.sol";
 import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
+import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 
 contract RollbackIntegrationTest is Test, DeployInput {
   FakeProtocolContract public fakeProtocolContract;
@@ -46,6 +47,13 @@ contract RollbackIntegrationTest is Test, DeployInput {
     // Setup rollback helper
     rollbackHelper = new FakeProtocolRollbackTestHelper(fakeProtocolContract, upgradeRegressionManager);
   }
+
+  /// @notice Helper function to assert that a rollback state equals an expected state.
+  /// @param _rollbackId The rollback ID to check.
+  /// @param _expectedState The expected ProposalState.
+  function _assertEqState(uint256 _rollbackId, IGovernor.ProposalState _expectedState) internal view {
+    assertEq(uint8(upgradeRegressionManager.state(_rollbackId)), uint8(_expectedState));
+  }
 }
 
 contract ProposeWithRollback is RollbackIntegrationTest {
@@ -64,14 +72,13 @@ contract ProposeWithRollback is RollbackIntegrationTest {
     assertEq(fakeProtocolContract.fee(), feeWhenProposalIsExecuted);
     assertEq(fakeProtocolContract.feeGuardian(), feeGuardianWhenProposalIsExecuted);
 
-    // 4. Verify rollback is proposed to URM
+    // 4. Verify rollback is proposed to URM and is in pending state
     uint256 _rollbackId = rollbackHelper.getRollbackId(feeWhenRollbackIsExecuted, feeGuardianWhenRollbackIsExecuted);
-    assertTrue(upgradeRegressionManager.isRollbackEligibleToQueue(_rollbackId));
+    _assertEqState(_rollbackId, IGovernor.ProposalState.Pending);
 
+    // 5. Verify rollback is in expired state
     vm.warp(block.timestamp + upgradeRegressionManager.rollbackQueueWindow() + 1);
-
-    // 5. Verify rollback is not eligible to queue outside window
-    assertFalse(upgradeRegressionManager.isRollbackEligibleToQueue(_rollbackId));
+    _assertEqState(_rollbackId, IGovernor.ProposalState.Expired);
   }
 
   function testFork_RollbackExecutionFlow() public {
@@ -96,7 +103,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
 
     // 5. Queue rollback
     vm.prank(GUARDIAN);
-    upgradeRegressionManager.queue(targets, values, calldatas, description);
+    uint256 _rollbackId = upgradeRegressionManager.queue(targets, values, calldatas, description);
 
     // 5. Wait for timelock delay and execute rollback
     uint256 timelockDelay = upgradeRegressionManager.TARGET().delay();
@@ -109,6 +116,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
     // 6. Verify rollback was successfully executed
     assertEq(fakeProtocolContract.fee(), feeWhenRollbackIsExecuted);
     assertEq(fakeProtocolContract.feeGuardian(), feeGuardianWhenRollbackIsExecuted);
+    _assertEqState(_rollbackId, IGovernor.ProposalState.Executed);
   }
 
   function testFork_RollbackExecutionWithNativeTokenProposal() public {
@@ -186,8 +194,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
     // 7. Verify rollback was successfully cancelled
     assertEq(fakeProtocolContract.fee(), feeWhenProposalIsExecuted);
     assertEq(fakeProtocolContract.feeGuardian(), feeGuardianWhenProposalIsExecuted);
-    assertFalse(upgradeRegressionManager.isRollbackEligibleToQueue(_rollbackId));
-    assertFalse(upgradeRegressionManager.isRollbackReadyToExecute(_rollbackId));
+    _assertEqState(_rollbackId, IGovernor.ProposalState.Canceled);
   }
 
   function testFork_RevertIf_UnauthorizedCallToCancelRollback() public {
