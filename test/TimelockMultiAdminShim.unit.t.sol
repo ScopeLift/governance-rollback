@@ -514,16 +514,3 @@ contract Fallback is TimelockMultiAdminShimTest {
     assertTrue(success);
   }
 }
-
-/// @dev Internal Functions Skipped as these are not intended to be inherited by other contracts
-contract _revertIfCannotQueue is TimelockMultiAdminShimTest {}
-
-contract _revertIfNotAdminOrExecutor is TimelockMultiAdminShimTest {}
-
-contract _revertIfNotAdmin is TimelockMultiAdminShimTest {}
-
-contract _revertIfNotTimelock is TimelockMultiAdminShimTest {}
-
-contract _setAdmin is TimelockMultiAdminShimTest {}
-
-contract _revertIfInvalidExecutor is TimelockMultiAdminShimTest {}

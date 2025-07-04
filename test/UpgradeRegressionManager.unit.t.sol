@@ -4,6 +4,8 @@ pragma solidity ^0.8.30;
 // Contract Imports
 import {UpgradeRegressionManager} from "src/contracts/UpgradeRegressionManager.sol";
 import {ITimelockTarget} from "src/interfaces/ITimelockTarget.sol";
+import {Rollback} from "src/interfaces/IUpgradeRegressionManager.sol";
+import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 
 // Test Imports
 import {Test} from "forge-std/Test.sol";
@@ -184,6 +186,30 @@ contract Constructor is UpgradeRegressionManagerTest {
   }
 }
 
+contract GetRollback is UpgradeRegressionManagerTest {
+  function testFuzz_ReturnsTheRollbackData(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    _proposeRollback(_targets, _values, _calldatas, _description);
+
+    uint256 _rollbackId = upgradeRegressionManager.getRollbackId(_targets, _values, _calldatas, _description);
+    uint256 _rollbackQueueWindow = upgradeRegressionManager.rollbackQueueWindow();
+
+    Rollback memory _rollback = upgradeRegressionManager.getRollback(_rollbackId);
+
+    assertEq(_rollback.queueExpiresAt, block.timestamp + _rollbackQueueWindow);
+    assertEq(_rollback.executableAt, 0);
+    assertEq(_rollback.canceled, false);
+    assertEq(_rollback.executed, false);
+  }
+}
+
 contract Propose is UpgradeRegressionManagerTest {
   function testFuzz_AllowTheAdminToProposeARollbackAndReturnsTheRollbackId(
     address[2] memory _targetsFixed,
@@ -222,7 +248,7 @@ contract Propose is UpgradeRegressionManagerTest {
     upgradeRegressionManager.propose(_targets, _values, _calldatas, _description);
   }
 
-  function testFuzz_AddsOnlyToRollbackQueue(
+  function testFuzz_RollbackStateIsCorrectlySet(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
@@ -233,15 +259,33 @@ contract Propose is UpgradeRegressionManagerTest {
 
     uint256 _computedRollbackId = upgradeRegressionManager.getRollbackId(_targets, _values, _calldatas, _description);
 
-    assertEq(upgradeRegressionManager.rollbackQueueExpiresAt(_computedRollbackId), 0);
+    vm.prank(admin);
+    upgradeRegressionManager.propose(_targets, _values, _calldatas, _description);
+
+    Rollback memory _rollback = upgradeRegressionManager.getRollback(_computedRollbackId);
+
+    assertEq(_rollback.queueExpiresAt, block.timestamp + rollbackQueueWindow);
+    assertEq(_rollback.executableAt, 0);
+    assertEq(_rollback.canceled, false);
+    assertEq(_rollback.executed, false);
+  }
+
+  function testFuzz_SetsTheProposalStateToPending(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _computedRollbackId = upgradeRegressionManager.getRollbackId(_targets, _values, _calldatas, _description);
 
     vm.prank(admin);
     upgradeRegressionManager.propose(_targets, _values, _calldatas, _description);
 
-    assertEq(
-      upgradeRegressionManager.rollbackQueueExpiresAt(_computedRollbackId), block.timestamp + rollbackQueueWindow
-    );
-    assertEq(upgradeRegressionManager.rollbackExecutableAt(_computedRollbackId), 0);
+    IGovernor.ProposalState _state = upgradeRegressionManager.state(_computedRollbackId);
+    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Pending));
   }
 
   function testFuzz_SetsTheExpirationTimeBasedOnRollbackQueueWindow(
@@ -262,7 +306,7 @@ contract Propose is UpgradeRegressionManagerTest {
     uint256 _rollbackId = upgradeRegressionManager.propose(_targets, _values, _calldatas, _description);
     vm.stopPrank();
 
-    assertEq(upgradeRegressionManager.rollbackQueueExpiresAt(_rollbackId), block.timestamp + _rollbackQueueWindow);
+    assertEq(upgradeRegressionManager.getRollback(_rollbackId).queueExpiresAt, block.timestamp + _rollbackQueueWindow);
   }
 
   function testFuzz_RevertIf_RollbackAlreadyExists(
@@ -363,7 +407,7 @@ contract Queue is UpgradeRegressionManagerTest {
     assertEq(_lastQueueTransactionCalls[1].eta, block.timestamp + timelockTarget.delay());
   }
 
-  function testFuzz_SetsTheExecutableTimeToAfterTimelockTargetDelay(
+  function testFuzz_RollbackStateIsCorrectlySet(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
@@ -374,9 +418,32 @@ contract Queue is UpgradeRegressionManagerTest {
 
     uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
 
+    uint256 _queueExpiresAtBeforeQueuing = upgradeRegressionManager.getRollback(_rollbackId).queueExpiresAt;
+
     vm.prank(guardian);
     upgradeRegressionManager.queue(_targets, _values, _calldatas, _description);
-    assertEq(upgradeRegressionManager.rollbackExecutableAt(_rollbackId), block.timestamp + timelockTarget.delay());
+
+    Rollback memory _rollback = upgradeRegressionManager.getRollback(_rollbackId);
+
+    assertEq(_rollback.queueExpiresAt, _queueExpiresAtBeforeQueuing);
+    assertEq(_rollback.executableAt, block.timestamp + timelockTarget.delay());
+    assertEq(_rollback.canceled, false);
+    assertEq(_rollback.executed, false);
+  }
+
+  function testFuzz_SetsTheProposalStateToQueued(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
+
+    IGovernor.ProposalState _state = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Queued));
   }
 
   function testFuzz_EmitsRollbackQueued(
@@ -395,43 +462,6 @@ contract Queue is UpgradeRegressionManagerTest {
 
     vm.prank(guardian);
     upgradeRegressionManager.queue(_targets, _values, _calldatas, _description);
-  }
-
-  function testFuzz_RemovesFromRollbackQueue(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-
-    uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
-
-    vm.prank(guardian);
-    upgradeRegressionManager.queue(_targets, _values, _calldatas, _description);
-
-    assertEq(upgradeRegressionManager.rollbackQueueExpiresAt(_rollbackId), 0);
-  }
-
-  function testFuzz_AddsToRollbackExecutableAtQueue(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-
-    uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
-
-    // Ensure that the rollback is not already queued.
-    assertEq(upgradeRegressionManager.rollbackExecutableAt(_rollbackId), 0);
-
-    vm.prank(guardian);
-    upgradeRegressionManager.queue(_targets, _values, _calldatas, _description);
-
-    assertEq(upgradeRegressionManager.rollbackExecutableAt(_rollbackId), block.timestamp + timelockTarget.delay());
   }
 
   function testFuzz_RevertIf_CallerIsNotGuardian(
@@ -463,7 +493,9 @@ contract Queue is UpgradeRegressionManagerTest {
     uint256 _rollbackId = upgradeRegressionManager.getRollbackId(_targets, _values, _calldatas, _description);
 
     vm.expectRevert(
-      abi.encodeWithSelector(UpgradeRegressionManager.UpgradeRegressionManager__NotQueueable.selector, _rollbackId)
+      abi.encodeWithSelector(
+        UpgradeRegressionManager.UpgradeRegressionManager__NonExistentRollback.selector, _rollbackId
+      )
     );
     vm.prank(guardian);
     upgradeRegressionManager.queue(_targets, _values, _calldatas, _description);
@@ -490,22 +522,41 @@ contract Queue is UpgradeRegressionManagerTest {
     upgradeRegressionManager.queue(_targets, _values, _calldatas, _description);
   }
 
-  function testFuzz_RevertIf_RollbackQueueHasExpired(
-    uint256 _delay,
+  function testFuzz_RevertIf_QueueRollbackExpires(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
-    string memory _description
+    string memory _description,
+    uint256 _timeAfterExpiry
   ) external {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
 
     uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
 
-    _delay = bound(_delay, rollbackQueueWindow, type(uint256).max - block.timestamp);
+    // Verify the rollback is initially in pending state
+    IGovernor.ProposalState _initialState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_initialState), uint8(IGovernor.ProposalState.Pending));
 
-    vm.warp(block.timestamp + _delay);
+    // Warp to exactly when the queue window expires
+    vm.warp(block.timestamp + rollbackQueueWindow);
 
+    // Verify the rollback is now in expired state
+    IGovernor.ProposalState _expiredState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_expiredState), uint8(IGovernor.ProposalState.Expired));
+
+    // Try to queue the expired rollback - should revert with specific error
+    vm.expectRevert(
+      abi.encodeWithSelector(UpgradeRegressionManager.UpgradeRegressionManager__Expired.selector, _rollbackId)
+    );
+    vm.prank(guardian);
+    upgradeRegressionManager.queue(_targets, _values, _calldatas, _description);
+
+    // Warp further into the future and try again
+    _timeAfterExpiry = bound(_timeAfterExpiry, 1, 365 days);
+    vm.warp(block.timestamp + _timeAfterExpiry);
+
+    // Should still revert with the same error
     vm.expectRevert(
       abi.encodeWithSelector(UpgradeRegressionManager.UpgradeRegressionManager__Expired.selector, _rollbackId)
     );
@@ -586,7 +637,7 @@ contract Cancel is UpgradeRegressionManagerTest {
     upgradeRegressionManager.cancel(_targets, _values, _calldatas, _description);
   }
 
-  function testFuzz_RemovesFromRollbackExecutableAtQueue(
+  function testFuzz_RollbackStateIsCorrectlySet(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
@@ -596,11 +647,33 @@ contract Cancel is UpgradeRegressionManagerTest {
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
     uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
-    assertEq(upgradeRegressionManager.rollbackExecutableAt(_rollbackId), block.timestamp + timelockTarget.delay());
     vm.prank(guardian);
     upgradeRegressionManager.cancel(_targets, _values, _calldatas, _description);
 
-    assertEq(upgradeRegressionManager.rollbackExecutableAt(_rollbackId), 0);
+    Rollback memory _rollback = upgradeRegressionManager.getRollback(_rollbackId);
+
+    assertEq(_rollback.queueExpiresAt, block.timestamp + rollbackQueueWindow);
+    assertEq(_rollback.executableAt, block.timestamp + timelockTarget.delay());
+    assertEq(_rollback.canceled, true);
+    assertEq(_rollback.executed, false);
+  }
+
+  function testFuzz_SetsTheProposalStateToCanceled(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
+
+    vm.prank(guardian);
+    upgradeRegressionManager.cancel(_targets, _values, _calldatas, _description);
+
+    IGovernor.ProposalState _state = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Canceled));
   }
 
   function testFuzz_RevertIf_RollbackWasNeverProposed(
@@ -614,7 +687,9 @@ contract Cancel is UpgradeRegressionManagerTest {
     uint256 _computedRollbackId = upgradeRegressionManager.getRollbackId(_targets, _values, _calldatas, _description);
 
     vm.expectRevert(
-      abi.encodeWithSelector(UpgradeRegressionManager.UpgradeRegressionManager__NotQueued.selector, _computedRollbackId)
+      abi.encodeWithSelector(
+        UpgradeRegressionManager.UpgradeRegressionManager__NonExistentRollback.selector, _computedRollbackId
+      )
     );
     vm.prank(guardian);
     upgradeRegressionManager.cancel(_targets, _values, _calldatas, _description);
@@ -640,7 +715,7 @@ contract Cancel is UpgradeRegressionManagerTest {
     upgradeRegressionManager.cancel(_targets, _values, _calldatas, _description);
   }
 
-  function testFuzz_RevertIf_RollbackWasAlreadyExecuted(
+  function testFuzz_RevertIf_CancelExecutedRollback(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
@@ -648,17 +723,32 @@ contract Cancel is UpgradeRegressionManagerTest {
   ) external {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
     uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
+    // Verify the rollback is initially in queued state
+    IGovernor.ProposalState _initialState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_initialState), uint8(IGovernor.ProposalState.Queued));
+
+    // Warp to after the execution time and execute the rollback
     vm.warp(block.timestamp + timelockTarget.delay());
     vm.prank(guardian);
     upgradeRegressionManager.execute(_targets, _values, _calldatas, _description);
 
+    // Verify the rollback is now in executed state
+    IGovernor.ProposalState _executedState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_executedState), uint8(IGovernor.ProposalState.Executed));
+
+    // Try to cancel the executed rollback - should revert with specific error
     vm.expectRevert(
       abi.encodeWithSelector(UpgradeRegressionManager.UpgradeRegressionManager__NotQueued.selector, _rollbackId)
     );
     vm.prank(guardian);
     upgradeRegressionManager.cancel(_targets, _values, _calldatas, _description);
+
+    // Verify the rollback is still in executed state after the failed cancel attempt
+    IGovernor.ProposalState _finalState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_finalState), uint8(IGovernor.ProposalState.Executed));
   }
 
   function testFuzz_RevertIf_CallerIsNotGuardian(
@@ -755,7 +845,7 @@ contract Execute is UpgradeRegressionManagerTest {
     upgradeRegressionManager.execute(_targets, _values, _calldatas, _description);
   }
 
-  function testFuzz_RemovesFromRollbackExecutableAtQueue(
+  function testFuzz_RollbackStateIsCorrectlySet(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
@@ -765,12 +855,37 @@ contract Execute is UpgradeRegressionManagerTest {
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
     uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
-    assertEq(upgradeRegressionManager.rollbackExecutableAt(_rollbackId), block.timestamp + timelockTarget.delay());
+    uint256 _queueExpiresAt = upgradeRegressionManager.getRollback(_rollbackId).queueExpiresAt;
+    uint256 _executableAt = upgradeRegressionManager.getRollback(_rollbackId).executableAt;
+
+    vm.warp(_queueExpiresAt);
+    vm.prank(guardian);
+    upgradeRegressionManager.execute(_targets, _values, _calldatas, _description);
+
+    Rollback memory _rollback = upgradeRegressionManager.getRollback(_rollbackId);
+
+    assertEq(_rollback.queueExpiresAt, _queueExpiresAt);
+    assertEq(_rollback.executableAt, _executableAt);
+    assertEq(_rollback.canceled, false);
+    assertEq(_rollback.executed, true);
+  }
+
+  function testFuzz_SetsTheProposalStateToExecuted(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+    uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
+
     vm.warp(block.timestamp + timelockTarget.delay());
     vm.prank(guardian);
     upgradeRegressionManager.execute(_targets, _values, _calldatas, _description);
 
-    assertEq(upgradeRegressionManager.rollbackExecutableAt(_rollbackId), 0);
+    IGovernor.ProposalState _state = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Executed));
   }
 
   function testFuzz_RevertIf_RollbackExecutionEtaHasNotPassed(
@@ -804,13 +919,15 @@ contract Execute is UpgradeRegressionManagerTest {
     vm.warp(block.timestamp + timelockTarget.delay());
 
     vm.expectRevert(
-      abi.encodeWithSelector(UpgradeRegressionManager.UpgradeRegressionManager__NotQueued.selector, _computedRollbackId)
+      abi.encodeWithSelector(
+        UpgradeRegressionManager.UpgradeRegressionManager__NonExistentRollback.selector, _computedRollbackId
+      )
     );
     vm.prank(guardian);
     upgradeRegressionManager.execute(_targets, _values, _calldatas, _description);
   }
 
-  function testFuzz_RevertIf_RollbackWasAlreadyCanceled(
+  function testFuzz_RevertIf_ExecuteCanceledRollback(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
@@ -818,18 +935,34 @@ contract Execute is UpgradeRegressionManagerTest {
   ) external {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
     uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
+    // Verify the rollback is initially in queued state
+    IGovernor.ProposalState _initialState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_initialState), uint8(IGovernor.ProposalState.Queued));
+
+    // Cancel the rollback
     vm.prank(guardian);
     upgradeRegressionManager.cancel(_targets, _values, _calldatas, _description);
 
+    // Verify the rollback is now in canceled state
+    IGovernor.ProposalState _canceledState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_canceledState), uint8(IGovernor.ProposalState.Canceled));
+
+    // Warp to after the execution time would have been
     vm.warp(block.timestamp + timelockTarget.delay());
 
+    // Try to execute the canceled rollback - should revert with specific error
     vm.expectRevert(
       abi.encodeWithSelector(UpgradeRegressionManager.UpgradeRegressionManager__NotQueued.selector, _rollbackId)
     );
     vm.prank(guardian);
     upgradeRegressionManager.execute(_targets, _values, _calldatas, _description);
+
+    // Verify the rollback is still in canceled state after the failed execution attempt
+    IGovernor.ProposalState _finalState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_finalState), uint8(IGovernor.ProposalState.Canceled));
   }
 
   function testFuzz_RevertIf_RollbackWasAlreadyExecuted(
@@ -898,12 +1031,52 @@ contract Execute is UpgradeRegressionManagerTest {
   }
 }
 
-contract IsRollbackEligibleToQueue is UpgradeRegressionManagerTest {
-  function test_ReturnsFalseIfRollbackDoesNotExist(uint256 _rollbackId) external view {
-    assertEq(upgradeRegressionManager.isRollbackEligibleToQueue(_rollbackId), false);
+contract State is UpgradeRegressionManagerTest {
+  function testFuzz_PendingWithinQueueWindow(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description,
+    uint256 _timeOffset
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    // Bound time offset to be within the queue window
+    _timeOffset = bound(_timeOffset, 0, rollbackQueueWindow - 1);
+
+    uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
+
+    // Warp to a time within the expiry window
+    vm.warp(block.timestamp + _timeOffset);
+
+    IGovernor.ProposalState _state = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Pending));
   }
 
-  function test_ReturnsFalseIfRollbackQueueExpiryWindowHasPassed(
+  function testFuzz_ExpiredAfterQueueWindow(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description,
+    uint256 _timeOffset
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    // Bound time offset to be after the queue window
+    _timeOffset = bound(_timeOffset, rollbackQueueWindow, rollbackQueueWindow + 30 days);
+
+    uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
+
+    // Warp to a time after the expiry window
+    vm.warp(block.timestamp + _timeOffset);
+
+    IGovernor.ProposalState _state = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Expired));
+  }
+
+  function testFuzz_ExpiredAtExactBoundary(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
@@ -912,13 +1085,75 @@ contract IsRollbackEligibleToQueue is UpgradeRegressionManagerTest {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
 
-    vm.prank(admin);
-    uint256 _rollbackId = upgradeRegressionManager.propose(_targets, _values, _calldatas, _description);
-    vm.warp(block.timestamp + rollbackQueueWindow + 1);
-    assertEq(upgradeRegressionManager.isRollbackEligibleToQueue(_rollbackId), false);
+    uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
+
+    // Verify the rollback is initially in pending state
+    IGovernor.ProposalState _initialState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_initialState), uint8(IGovernor.ProposalState.Pending));
+
+    // Warp to exactly when the queue window expires
+    vm.warp(block.timestamp + rollbackQueueWindow);
+
+    // Verify the rollback is now in expired state at the exact boundary
+    IGovernor.ProposalState _exactExpirationState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_exactExpirationState), uint8(IGovernor.ProposalState.Expired));
+
+    // Warp 1 second before expiration to verify it's still pending
+    vm.warp(block.timestamp - rollbackQueueWindow + rollbackQueueWindow - 1);
+    IGovernor.ProposalState _beforeExpirationState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_beforeExpirationState), uint8(IGovernor.ProposalState.Pending));
+
+    // Warp back to exact expiration time
+    vm.warp(block.timestamp + 1);
+    IGovernor.ProposalState _atExpirationState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_atExpirationState), uint8(IGovernor.ProposalState.Expired));
   }
 
-  function test_ReturnsTrueIfRollbackQueueExpiryWindowHasNotPassed(
+  function testFuzz_QueuedBeforeExecutionTime(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description,
+    uint256 _timeOffset
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
+
+    // Bound time offset to be before the executable time
+    _timeOffset = bound(_timeOffset, 0, timelockTarget.delay() - 1);
+
+    // Warp to a time before the executable window
+    vm.warp(block.timestamp + _timeOffset);
+
+    IGovernor.ProposalState _state = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Queued));
+  }
+
+  function testFuzz_QueuedRollbackStateAfterExecutionTime(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description,
+    uint256 _timeOffset
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
+
+    // Bound time offset to be after the executable time
+    _timeOffset = bound(_timeOffset, timelockTarget.delay(), timelockTarget.delay() + 30 days);
+
+    // Warp to a time after the executable window
+    vm.warp(block.timestamp + _timeOffset);
+
+    IGovernor.ProposalState _state = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Queued));
+  }
+
+  function testFuzz_QueuedAtExactExecutionTime(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
@@ -927,54 +1162,88 @@ contract IsRollbackEligibleToQueue is UpgradeRegressionManagerTest {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
 
-    vm.prank(admin);
-    uint256 _rollbackId = upgradeRegressionManager.propose(_targets, _values, _calldatas, _description);
+    uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
-    assertEq(upgradeRegressionManager.isRollbackEligibleToQueue(_rollbackId), true);
-  }
-}
+    // Verify the rollback is initially in queued state
+    IGovernor.ProposalState _initialState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_initialState), uint8(IGovernor.ProposalState.Queued));
 
-contract IsRollbackReadyToExecute is UpgradeRegressionManagerTest {
-  function test_ReturnsFalseIfRollbackDoesNotExist(uint256 _rollbackId) external view {
-    assertEq(upgradeRegressionManager.isRollbackReadyToExecute(_rollbackId), false);
-  }
-
-  function test_ReturnsFalseIfRollbackExecutionDelayHasNotPassed(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-
-    vm.prank(admin);
-    uint256 _rollbackId = upgradeRegressionManager.propose(_targets, _values, _calldatas, _description);
-
-    vm.prank(guardian);
-    upgradeRegressionManager.queue(_targets, _values, _calldatas, _description);
-
-    assertEq(upgradeRegressionManager.isRollbackReadyToExecute(_rollbackId), false);
-  }
-
-  function test_ReturnsTrueIfRollbackExecutionDelayHasPassed(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-
-    vm.prank(admin);
-    uint256 _rollbackId = upgradeRegressionManager.propose(_targets, _values, _calldatas, _description);
-
-    vm.prank(guardian);
-    upgradeRegressionManager.queue(_targets, _values, _calldatas, _description);
-
+    // Warp to exactly when the execution time arrives
     vm.warp(block.timestamp + timelockTarget.delay());
 
-    assertEq(upgradeRegressionManager.isRollbackReadyToExecute(_rollbackId), true);
+    // Verify the rollback is now in queued state at the exact boundary
+    IGovernor.ProposalState _exactExecutionState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_exactExecutionState), uint8(IGovernor.ProposalState.Queued));
+
+    // Warp 1 second before execution time to verify it's still queued
+    vm.warp(block.timestamp - timelockTarget.delay() + timelockTarget.delay() - 1);
+    IGovernor.ProposalState _beforeExecutionState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_beforeExecutionState), uint8(IGovernor.ProposalState.Queued));
+
+    // Warp back to exact execution time
+    vm.warp(block.timestamp + 1);
+    IGovernor.ProposalState _atExecutionState = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_atExecutionState), uint8(IGovernor.ProposalState.Queued));
+  }
+
+  function testFuzz_ExecutedState(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
+
+    // Warp to executable time
+    vm.warp(block.timestamp + timelockTarget.delay());
+
+    // Execute the rollback
+    vm.prank(guardian);
+    upgradeRegressionManager.execute(_targets, _values, _calldatas, _description);
+
+    IGovernor.ProposalState _state = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Executed));
+  }
+
+  function testFuzz_CanceledState(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
+
+    // Cancel the rollback
+    vm.prank(guardian);
+    upgradeRegressionManager.cancel(_targets, _values, _calldatas, _description);
+
+    IGovernor.ProposalState _state = upgradeRegressionManager.state(_rollbackId);
+    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Canceled));
+  }
+
+  function testFuzz_RevertIf_RollbackDoesNotExist(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = upgradeRegressionManager.getRollbackId(_targets, _values, _calldatas, _description);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        UpgradeRegressionManager.UpgradeRegressionManager__NonExistentRollback.selector, _rollbackId
+      )
+    );
+    upgradeRegressionManager.state(_rollbackId);
   }
 }
 
@@ -1094,16 +1363,3 @@ contract GetRollbackId is UpgradeRegressionManagerTest {
     assertEq(_rollbackId, uint256(keccak256(abi.encode(_targets, _values, _calldatas, _description))));
   }
 }
-
-/// @dev Internal Functions Skipped as these are not intended to be inherited by other contracts
-contract _revertIfNotAdmin is UpgradeRegressionManagerTest {}
-
-contract _revertIfNotGuardian is UpgradeRegressionManagerTest {}
-
-contract _revertIfMismatchedParameters is UpgradeRegressionManagerTest {}
-
-contract _setGuardian is UpgradeRegressionManagerTest {}
-
-contract _setRollbackQueueWindow is UpgradeRegressionManagerTest {}
-
-contract _setAdmin is UpgradeRegressionManagerTest {}
