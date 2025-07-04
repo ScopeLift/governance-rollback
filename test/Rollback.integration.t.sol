@@ -12,6 +12,7 @@ import {FakeProtocolRollbackTestHelper} from "test/fakes/FakeProtocolRollbackTes
 import {UpgradeRegressionManager} from "src/contracts/UpgradeRegressionManager.sol";
 import {DeployInput} from "script/DeployInput.sol";
 import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
+import {ProposalState} from "src/types/GovernanceTypes.sol";
 
 contract RollbackIntegrationTest is Test, DeployInput {
   FakeProtocolContract public fakeProtocolContract;
@@ -64,14 +65,13 @@ contract ProposeWithRollback is RollbackIntegrationTest {
     assertEq(fakeProtocolContract.fee(), feeWhenProposalIsExecuted);
     assertEq(fakeProtocolContract.feeGuardian(), feeGuardianWhenProposalIsExecuted);
 
-    // 4. Verify rollback is proposed to URM
+    // 4. Verify rollback is proposed to URM and is in pending state
     uint256 _rollbackId = rollbackHelper.getRollbackId(feeWhenRollbackIsExecuted, feeGuardianWhenRollbackIsExecuted);
-    assertTrue(upgradeRegressionManager.isRollbackEligibleToQueue(_rollbackId));
+    assertEq(uint8(upgradeRegressionManager.state(_rollbackId)), uint8(ProposalState.Pending));
 
+    // 5. Verify rollback is in expired state
     vm.warp(block.timestamp + upgradeRegressionManager.rollbackQueueWindow() + 1);
-
-    // 5. Verify rollback is not eligible to queue outside window
-    assertFalse(upgradeRegressionManager.isRollbackEligibleToQueue(_rollbackId));
+    assertEq(uint8(upgradeRegressionManager.state(_rollbackId)), uint8(ProposalState.Expired));
   }
 
   function testFork_RollbackExecutionFlow() public {
@@ -96,7 +96,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
 
     // 5. Queue rollback
     vm.prank(GUARDIAN);
-    upgradeRegressionManager.queue(targets, values, calldatas, description);
+    uint256 _rollbackId = upgradeRegressionManager.queue(targets, values, calldatas, description);
 
     // 5. Wait for timelock delay and execute rollback
     uint256 timelockDelay = upgradeRegressionManager.TARGET().delay();
@@ -109,6 +109,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
     // 6. Verify rollback was successfully executed
     assertEq(fakeProtocolContract.fee(), feeWhenRollbackIsExecuted);
     assertEq(fakeProtocolContract.feeGuardian(), feeGuardianWhenRollbackIsExecuted);
+    assertEq(uint8(upgradeRegressionManager.state(_rollbackId)), uint8(ProposalState.Executed));
   }
 
   function testFork_RollbackExecutionWithNativeTokenProposal() public {
@@ -186,8 +187,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
     // 7. Verify rollback was successfully cancelled
     assertEq(fakeProtocolContract.fee(), feeWhenProposalIsExecuted);
     assertEq(fakeProtocolContract.feeGuardian(), feeGuardianWhenProposalIsExecuted);
-    assertFalse(upgradeRegressionManager.isRollbackEligibleToQueue(_rollbackId));
-    assertFalse(upgradeRegressionManager.isRollbackReadyToExecute(_rollbackId));
+    assertEq(uint8(upgradeRegressionManager.state(_rollbackId)), uint8(ProposalState.Canceled));
   }
 
   function testFork_RevertIf_UnauthorizedCallToCancelRollback() public {

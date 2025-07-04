@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 // Internal Libraries
 import {ITimelockTarget} from "interfaces/ITimelockTarget.sol";
+import {Rollback, ProposalState} from "types/GovernanceTypes.sol";
 
 interface IUpgradeRegressionManager {
   /*///////////////////////////////////////////////////////////////
@@ -17,17 +18,11 @@ interface IUpgradeRegressionManager {
 
   function rollbackQueueWindow() external view returns (uint256);
 
-  function rollbackQueueExpiresAt(uint256 _rollbackId) external view returns (uint256);
-
-  function rollbackExecutableAt(uint256 _rollbackId) external view returns (uint256);
+  function getRollback(uint256 _rollbackId) external view returns (Rollback memory);
 
   /*///////////////////////////////////////////////////////////////
                      External Functions 
   //////////////////////////////////////////////////////////////*/
-
-  function isRollbackEligibleToQueue(uint256 _rollbackId) external view returns (bool);
-
-  function isRollbackReadyToExecute(uint256 _rollbackId) external view returns (bool);
 
   function propose(
     address[] memory _targets,
@@ -73,4 +68,6 @@ interface IUpgradeRegressionManager {
     bytes[] memory _calldatas,
     string memory _description
   ) external view returns (uint256 _rollbackId);
+
+  function state(uint256 _rollbackId) external view returns (ProposalState);
 }

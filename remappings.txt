@@ -4,4 +4,5 @@ forge-std/=lib/forge-std/src/
 
 contracts/=src/contracts
 interfaces/=src/interfaces
+types/=src/types
 @openzeppelin/contracts-upgradeable/=lib/compound-governance-upgrade/lib/openzeppelin-contracts-upgradeable/contracts/
