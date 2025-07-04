@@ -4,6 +4,7 @@ pragma solidity ^0.8.30;
 // Internal Libraries
 import {ITimelockTarget} from "interfaces/ITimelockTarget.sol";
 import {IUpgradeRegressionManager} from "interfaces/IUpgradeRegressionManager.sol";
+import {Rollback, ProposalState} from "types/GovernanceTypes.sol";
 
 /// @title Upgrade Regression Manager
 /// @author [ScopeLift](https://scopelift.co)
@@ -110,11 +111,8 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @notice Time window after a rollback is proposed during which it can be queued for execution.
   uint256 public rollbackQueueWindow;
 
-  /// @notice Timestamp after which rollback queueing is no longer allowed.
-  mapping(uint256 rollbackId => uint256 deadline) public rollbackQueueExpiresAt;
-
-  /// @notice Time after which the rollback can be executed.
-  mapping(uint256 rollbackId => uint256 eta) public rollbackExecutableAt;
+  /// @notice Rollback id to rollback data.
+  mapping(uint256 rollbackId => Rollback) private _rollbacks;
 
   /*///////////////////////////////////////////////////////////////
                           Constructor
@@ -142,18 +140,11 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
                           External Functions
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Checks if a rollback is eligible to be queued.
-  /// @param _rollbackId The ID of the rollback.
-  /// @return True if the rollback is ready to be queued, false otherwise.
-  function isRollbackEligibleToQueue(uint256 _rollbackId) external view returns (bool) {
-    return rollbackQueueExpiresAt[_rollbackId] != 0 && block.timestamp < rollbackQueueExpiresAt[_rollbackId];
-  }
-
-  /// @notice Checks if a rollback is ready to be executed.
-  /// @param _rollbackId The ID of the rollback.
-  /// @return True if the rollback is ready to be executed, false otherwise.
-  function isRollbackReadyToExecute(uint256 _rollbackId) external view returns (bool) {
-    return rollbackExecutableAt[_rollbackId] != 0 && block.timestamp >= rollbackExecutableAt[_rollbackId];
+  /// @notice Get rollback data by ID.
+  /// @param _rollbackId The rollback ID.
+  /// @return The rollback data.
+  function getRollback(uint256 _rollbackId) external view returns (Rollback memory) {
+    return _rollbacks[_rollbackId];
   }
 
   /// @notice Proposes a rollback which can be queued for execution.
@@ -176,14 +167,16 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
 
     _rollbackId = getRollbackId(_targets, _values, _calldatas, _description);
 
+    Rollback storage _rollback = _rollbacks[_rollbackId];
+
     // Revert if the rollback already exists.
-    if (rollbackQueueExpiresAt[_rollbackId] != 0 || rollbackExecutableAt[_rollbackId] != 0) {
+    if (_getState(_rollback) != ProposalState.Unknown) {
       revert UpgradeRegressionManager__AlreadyExists(_rollbackId);
     }
 
     // Set the time before which the rollback can be queued for execution.
     uint256 _expiresAt = block.timestamp + rollbackQueueWindow;
-    rollbackQueueExpiresAt[_rollbackId] = _expiresAt;
+    _rollback.queueExpiresAt = _expiresAt;
 
     emit RollbackProposed(_rollbackId, _expiresAt, _targets, _values, _calldatas, _description);
   }
@@ -195,7 +188,7 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @param _description The description of the rollback.
   /// @return _rollbackId The rollback ID.
   /// @dev Can only be called by the guardian.
-  ///      Must be called before the rollback queue window expires (`rollbackQueueExpiresAt`).
+  ///      Must be called before the rollback queue window expires (`Rollback.queueExpiresAt`).
   ///      Queues the rollback transactions to enable optional execution during the allowed window.
   function queue(
     address[] memory _targets,
@@ -208,22 +201,22 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
 
     _rollbackId = getRollbackId(_targets, _values, _calldatas, _description);
 
-    // Revert if the rollback not proposed or already queued.
-    if (rollbackQueueExpiresAt[_rollbackId] == 0) {
-      revert UpgradeRegressionManager__NotQueueable(_rollbackId);
-    }
+    Rollback storage _rollback = _rollbacks[_rollbackId];
 
-    // Revert if the rollback queue has expired.
-    if (block.timestamp >= rollbackQueueExpiresAt[_rollbackId]) {
-      revert UpgradeRegressionManager__Expired(_rollbackId);
+    ProposalState _state = _getState(_rollback);
+
+    // Revert if the rollback is not pending.
+    if (_state != ProposalState.Pending) {
+      // Custom revert if the rollback queue has expired.
+      if (_state == ProposalState.Expired) {
+        revert UpgradeRegressionManager__Expired(_rollbackId);
+      }
+      revert UpgradeRegressionManager__NotQueueable(_rollbackId);
     }
 
     // Set the time after which the queued rollback can be executed.
     uint256 _eta = block.timestamp + TARGET.delay();
-    rollbackExecutableAt[_rollbackId] = _eta;
-
-    // Remove the rollback from the waiting queue since it has now been queued for execution.
-    delete rollbackQueueExpiresAt[_rollbackId];
+    _rollback.executableAt = _eta;
 
     // Queue the rollback transactions.
     for (uint256 _i = 0; _i < _targets.length; _i++) {
@@ -253,18 +246,20 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
 
     _rollbackId = getRollbackId(_targets, _values, _calldatas, _description);
 
-    // Revert if the rollback is not queued for execution.
-    if (rollbackExecutableAt[_rollbackId] == 0) {
+    Rollback storage _rollback = _rollbacks[_rollbackId];
+    ProposalState _state = _getState(_rollback);
+
+    // Revert if the rollback has been queued or is ready to be executed.
+    if (_state != ProposalState.Queued && _state != ProposalState.Active) {
       revert UpgradeRegressionManager__NotQueued(_rollbackId);
     }
 
     // Cancel the rollback transactions.
     for (uint256 _i = 0; _i < _targets.length; _i++) {
-      TARGET.cancelTransaction(_targets[_i], _values[_i], "", _calldatas[_i], rollbackExecutableAt[_rollbackId]);
+      TARGET.cancelTransaction(_targets[_i], _values[_i], "", _calldatas[_i], _rollback.executableAt);
     }
 
-    // Remove the rollback from execution queue
-    delete rollbackExecutableAt[_rollbackId];
+    _rollback.canceled = true;
 
     emit RollbackCanceled(_rollbackId);
   }
@@ -276,7 +271,7 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @param _description The description of the rollback.
   /// @return _rollbackId The rollback ID.
   /// @dev Can only be called by the guardian.
-  ///      Executes the queued rollback transactions after the execution window has begun (`rollbackExecutableAt`).
+  ///      Executes the queued rollback transactions after the execution window has begun (`Rollback.executableAt`).
   ///      Each transaction is forwarded to its target contract and executed sequentially.
   function execute(
     address[] memory _targets,
@@ -289,21 +284,24 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
 
     _rollbackId = getRollbackId(_targets, _values, _calldatas, _description);
 
-    if (rollbackExecutableAt[_rollbackId] == 0) {
-      revert UpgradeRegressionManager__NotQueued(_rollbackId);
-    }
+    Rollback storage _rollback = _rollbacks[_rollbackId];
+    ProposalState _state = _getState(_rollback);
 
-    if (block.timestamp < rollbackExecutableAt[_rollbackId]) {
-      revert UpgradeRegressionManager__ExecutionTooEarly(_rollbackId);
+    // Revert if the rollback is not active.
+    if (_state != ProposalState.Active) {
+      // Custom revert if the rollback is queued for execution but the execution time has not arrived.
+      if (_state == ProposalState.Queued) {
+        revert UpgradeRegressionManager__ExecutionTooEarly(_rollbackId);
+      }
+      revert UpgradeRegressionManager__NotQueued(_rollbackId);
     }
 
     // Execute the rollback.
     for (uint256 _i = 0; _i < _targets.length; _i++) {
-      TARGET.executeTransaction(_targets[_i], _values[_i], "", _calldatas[_i], rollbackExecutableAt[_rollbackId]);
+      TARGET.executeTransaction(_targets[_i], _values[_i], "", _calldatas[_i], _rollback.executableAt);
     }
 
-    // Remove the rollback from the execution queue.
-    delete rollbackExecutableAt[_rollbackId];
+    _rollback.executed = true;
 
     emit RollbackExecuted(_rollbackId);
   }
@@ -351,6 +349,12 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
     string memory _description
   ) public pure returns (uint256) {
     return uint256(keccak256(abi.encode(_targets, _values, _calldatas, _description)));
+  }
+
+  /// @notice Returns the current state of a proposed rollback by its ID.
+  /// @param _rollbackId The ID of the rollback to check.
+  function state(uint256 _rollbackId) public view returns (ProposalState) {
+    return _getState(_rollbacks[_rollbackId]);
   }
 
   /*///////////////////////////////////////////////////////////////
@@ -415,5 +419,52 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
 
     emit AdminSet(admin, _newAdmin);
     admin = _newAdmin;
+  }
+
+  /// @notice Returns the current state of a proposed rollback.
+  /// @param _rollback The rollback to check.
+  /// @return The current ProposalState of the rollback, which can be:
+  /// - `Unknown`: rollback does not exist (i.e., never proposed).
+  /// - `Pending`: proposed but not yet queued and not expired.
+  /// - `Expired`: proposed but not queued before expiration.
+  /// - `Queued`: queued for execution, but delay not elapsed.
+  /// - `Active`: queued and ready for execution.
+  /// - `Executed`: rollback has already been executed (terminal state).
+  /// - `Canceled`: rollback was canceled before execution (terminal state).
+  /// @dev This function determines the rollback's lifecycle state based on timestamps and flags.
+  function _getState(Rollback memory _rollback) internal view returns (ProposalState) {
+    // Revert if the rollback was not proposed (i.e., does not exist).
+    if (_rollback.queueExpiresAt == 0) {
+      return ProposalState.Unknown;
+    }
+
+    // Check if the rollback has been executed.
+    if (_rollback.executed) {
+      return ProposalState.Executed;
+    }
+
+    // Check if the rollback has been canceled.
+    if (_rollback.canceled) {
+      return ProposalState.Canceled;
+    }
+
+    // Check if the rollback has been queued for execution.
+    if (_rollback.executableAt != 0) {
+      if (block.timestamp >= _rollback.executableAt) {
+        // Rollback's execution time has arrived.
+        return ProposalState.Active;
+      } else {
+        // Rollback's execution time has not arrived.
+        return ProposalState.Queued;
+      }
+    }
+
+    if (block.timestamp >= _rollback.queueExpiresAt) {
+      // Rollback is proposed but it's queue window has expired.
+      return ProposalState.Expired;
+    }
+
+    // Rollback is proposed but not queued for execution.
+    return ProposalState.Pending;
   }
 }
