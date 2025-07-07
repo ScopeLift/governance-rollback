@@ -77,7 +77,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
     _assertEqState(_rollbackId, IGovernor.ProposalState.Pending);
 
     // 5. Verify rollback is in expired state
-    vm.warp(block.timestamp + upgradeRegressionManager.rollbackQueueWindow() + 1);
+    vm.warp(block.timestamp + upgradeRegressionManager.rollbackQueueableDuration() + 1);
     _assertEqState(_rollbackId, IGovernor.ProposalState.Expired);
   }
 
@@ -217,7 +217,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
     upgradeRegressionManager.queue(targets, values, calldatas, description);
   }
 
-  function testFork_RevertIf_RollbackQueueWindowHasExpired() public {
+  function testFork_RevertIf_RollbackQueueableDurationHasExpired() public {
     // 1. Create proposal to change fee to 100
     CompoundGovernorHelper.Proposal memory proposal = rollbackHelper.generateProposalWithRollback(
       feeWhenProposalIsExecuted,
@@ -233,8 +233,8 @@ contract ProposeWithRollback is RollbackIntegrationTest {
     (address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description) =
       rollbackHelper.generateRollbackData(feeWhenRollbackIsExecuted, feeGuardianWhenRollbackIsExecuted);
 
-    // 4. Wait for rollback queue window to expire
-    vm.warp(block.timestamp + upgradeRegressionManager.rollbackQueueWindow() + 1);
+    // 4. Wait for rollback queueable duration to expire
+    vm.warp(block.timestamp + upgradeRegressionManager.rollbackQueueableDuration() + 1);
 
     // 5. Attempt to queue rollback
     uint256 _rollbackId = rollbackHelper.getRollbackId(feeWhenRollbackIsExecuted, feeGuardianWhenRollbackIsExecuted);

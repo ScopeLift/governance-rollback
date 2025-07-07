@@ -14,8 +14,11 @@ contract DeployInput {
   // https://docs.google.com/document/d/19-GFwd34UlPHIx-AjlGlI3BQcWq71UKe/
   address public constant GUARDIAN = 0xbbf3f1421D886E9b2c5D716B5192aC998af2012c;
 
-  // Time window within which a rollback can be queued after it is proposed by admin
-  uint256 public constant ROLLBACK_QUEUE_WINDOW = 4 weeks;
+  // Time duration during which a proposed rollback can be queued for execution.
+  uint256 public constant ROLLBACK_QUEUEABLE_DURATION = 4 weeks;
+
+  // Lower bound for rollback queue duration (set to same value as COMPOUND_GOVERNOR.votingDelay)
+  uint256 public constant MIN_ROLLBACK_QUEUEABLE_DURATION = 13_140;
 
   // Deployed TimelockMultiAdminShim contract
   address public TIMELOCK_MULTI_ADMIN_SHIM = address(0);

@@ -41,7 +41,8 @@ contract DeployShimAndURM is Script, BaseLogger, DeployInput {
       ITimelockTarget(address(timelockMultiAdminShim)), // Target is the shim address
       COMPOUND_TIMELOCK, // admin is the compound timelock
       GUARDIAN, // Address that can queue, cancel and execute rollback
-      ROLLBACK_QUEUE_WINDOW // Time window within which a rollback can be queued after it is proposed by admin
+      ROLLBACK_QUEUEABLE_DURATION, // Duration after a rollback proposal during which it can be queued for execution
+      MIN_ROLLBACK_QUEUEABLE_DURATION // Lower bound enforced on the rollback queueable duration
     );
 
     vm.stopBroadcast();
