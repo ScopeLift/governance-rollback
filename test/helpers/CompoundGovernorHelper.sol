@@ -3,7 +3,6 @@ pragma solidity 0.8.30;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompoundTimelock.sol";
-import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 
 // Internal imports
 import {DeployInput} from "script/DeployInput.sol";
@@ -40,6 +39,7 @@ interface ICompoundGovernor {
   function proposalSnapshot(uint256 proposalId) external view returns (uint256);
   function proposalVoteStart(uint256 proposalId) external view returns (uint256);
   function proposalEta(uint256 proposalId) external view returns (uint256);
+  function state(uint256 proposalId) external view returns (uint8);
 }
 
 contract CompoundGovernorHelper is Test, DeployInput {
@@ -92,24 +92,7 @@ contract CompoundGovernorHelper is Test, DeployInput {
 
   /* Begin CompoundGovernor-related helper methods */
 
-  function _getProposalId(Proposal memory _proposal) internal view returns (uint256) {
-    return governor.hashProposal(
-      _proposal.targets, _proposal.values, _proposal.calldatas, keccak256(bytes(_proposal.description))
-    );
-  }
-
-  function _buildProposalData(string memory _signature, bytes memory _calldata) internal pure returns (bytes memory) {
-    return abi.encodePacked(bytes4(keccak256(bytes(_signature))), _calldata);
-  }
-
-  function _buildAnEmptyProposal() internal pure returns (Proposal memory _proposal) {
-    address[] memory _targets = new address[](1);
-    uint256[] memory _values = new uint256[](1);
-    bytes[] memory _calldatas = new bytes[](1);
-    _proposal = Proposal(_targets, _values, _calldatas, "An Empty Proposal");
-  }
-
-  function _getRandomProposer() public returns (address) {
+  function getRandomProposer() public returns (address) {
     return majorDelegates[vm.randomUint(0, majorDelegates.length - 1)];
   }
 
@@ -122,29 +105,31 @@ contract CompoundGovernorHelper is Test, DeployInput {
     return governor.isWhitelisted(_proposer);
   }
 
-  function _submitProposal(Proposal memory _proposal) public returns (uint256 _proposalId) {
-    vm.prank(_getRandomProposer());
+  function submitProposalWithRoll(Proposal memory _proposal) public returns (uint256 _proposalId) {
+    vm.prank(getRandomProposer());
     _proposalId = governor.propose(_proposal.targets, _proposal.values, _proposal.calldatas, _proposal.description);
 
     vm.roll(vm.getBlockNumber() + VOTING_DELAY + 1);
   }
 
-  function _submitProposal(address _proposer, Proposal memory _proposal) public returns (uint256 _proposalId) {
+  function submitProposalWithRoll(address _proposer, Proposal memory _proposal) public returns (uint256 _proposalId) {
     vm.prank(_proposer);
     _proposalId = governor.propose(_proposal.targets, _proposal.values, _proposal.calldatas, _proposal.description);
 
     vm.roll(vm.getBlockNumber() + VOTING_DELAY + 1);
   }
 
-  function _submitProposalWithoutRoll(address _proposer, Proposal memory _proposal)
-    public
-    returns (uint256 _proposalId)
-  {
+  function rollToVotingStart(uint256 _proposalId) public {
+    uint256 startBlock = governor.proposalSnapshot(_proposalId) + 1;
+    vm.roll(startBlock);
+  }
+
+  function submitProposalWithoutRoll(address _proposer, Proposal memory _proposal) public returns (uint256 _proposalId) {
     vm.prank(_proposer);
     _proposalId = governor.propose(_proposal.targets, _proposal.values, _proposal.calldatas, _proposal.description);
   }
 
-  function _passProposal(uint256 _proposalId) public {
+  function passProposalWithRoll(uint256 _proposalId) public {
     for (uint256 _index = 0; _index < majorDelegates.length; _index++) {
       vm.prank(majorDelegates[_index]);
       governor.castVote(_proposalId, 1); // 1 = For
@@ -152,23 +137,34 @@ contract CompoundGovernorHelper is Test, DeployInput {
     vm.roll(vm.getBlockNumber() + VOTING_PERIOD + 1);
   }
 
-  function _queueProposal(Proposal memory _proposal) public {
+  function passProposalWithRoll(uint256 _proposalId, uint256 _startDelegateIndex, uint256 _endDelegateIndex) public {
+    for (uint256 _index = _startDelegateIndex; _index < _endDelegateIndex; _index++) {
+      vm.prank(majorDelegates[_index]);
+      governor.castVote(_proposalId, 1); // 1 = For
+    }
+    vm.roll(vm.getBlockNumber() + VOTING_PERIOD + 1);
+  }
+
+  function castVotesViaDelegates(uint256 _proposalId, uint256 _startDelegateIndex, uint256 _endDelegateIndex) public {
+    for (uint256 _index = _startDelegateIndex; _index < _endDelegateIndex; _index++) {
+      vm.prank(majorDelegates[_index]);
+      governor.castVote(_proposalId, 1); // 1 = For
+    }
+  }
+
+  function queueProposal(Proposal memory _proposal) public {
     governor.queue(_proposal.targets, _proposal.values, _proposal.calldatas, keccak256(bytes(_proposal.description)));
   }
 
-  function _queueProposalById(uint256 _proposalId) public {
-    governor.queue(_proposalId);
-  }
-
-  function _passAndQueueProposal(Proposal memory _proposal, uint256 _proposalId) public {
+  function passAndQueueProposalWithRoll(Proposal memory _proposal, uint256 _proposalId) public {
     uint256 _timeLockDelay = timelock.delay();
-    _passProposal(_proposalId);
+    passProposalWithRoll(_proposalId);
     governor.queue(_proposal.targets, _proposal.values, _proposal.calldatas, keccak256(bytes(_proposal.description)));
 
     vm.warp(block.timestamp + _timeLockDelay + 1);
   }
 
-  function _passQueueAndExecuteProposal(Proposal memory _proposal, uint256 _proposalId) public {
+  function passQueueAndExecuteProposalWithRoll(Proposal memory _proposal, uint256 _proposalId) public {
     // Get the actual voting start block for this proposal (Compound Bravo: snapshot + 1)
     uint256 startBlock = governor.proposalSnapshot(_proposalId) + 1;
     vm.roll(startBlock);
@@ -186,7 +182,7 @@ contract CompoundGovernorHelper is Test, DeployInput {
     governor.execute(_proposal.targets, _proposal.values, _proposal.calldatas, keccak256(bytes(_proposal.description)));
   }
 
-  function _failProposal(uint256 _proposalId) public {
+  function failProposalWithRoll(uint256 _proposalId) public {
     for (uint256 _index = 0; _index < majorDelegates.length; _index++) {
       vm.prank(majorDelegates[_index]);
       governor.castVote(_proposalId, 0); // 0 = Against
@@ -195,33 +191,74 @@ contract CompoundGovernorHelper is Test, DeployInput {
     vm.roll(vm.getBlockNumber() + VOTING_PERIOD + 1);
   }
 
-  function _submitAndPassProposal(address _proposer, Proposal memory _proposal) public returns (uint256) {
-    uint256 _proposalId = _submitProposal(address(_proposer), _proposal);
-    _passProposal(uint256(_proposalId));
+  function submitAndPassProposal(address _proposer, Proposal memory _proposal) public returns (uint256) {
+    uint256 _proposalId = submitProposalWithoutRoll(_proposer, _proposal);
+
+    // Wait for voting to start (proposalSnapshot + 1)
+    uint256 startBlock = governor.proposalSnapshot(_proposalId) + 1;
+    vm.roll(startBlock);
+
+    passProposalWithRoll(_proposalId);
 
     return _proposalId;
   }
 
-  function _submitPassAndQueueProposal(address _proposer, Proposal memory _proposal) public returns (uint256) {
-    uint256 _proposalId = _submitProposal(_proposer, _proposal);
-    _passAndQueueProposal(_proposal, _proposalId);
+  function submitPassAndQueue(address _proposer, Proposal memory _proposal) public returns (uint256 _proposalId) {
+    // 1. Submit proposal (without rolling)
+    _proposalId = submitProposalWithoutRoll(_proposer, _proposal);
+
+    // 2. Wait for voting to start (proposalSnapshot + 1)
+    uint256 startBlock = governor.proposalSnapshot(_proposalId) + 1;
+    vm.roll(startBlock);
+
+    // 3. Vote on proposal
+    for (uint256 _index = 0; _index < majorDelegates.length; _index++) {
+      vm.prank(majorDelegates[_index]);
+      governor.castVote(_proposalId, 1); // 1 = For
+    }
+
+    // 4. Wait for voting to end
+    vm.roll(vm.getBlockNumber() + VOTING_PERIOD + 1);
+
+    // 5. Queue proposal
+    queueProposal(_proposal);
+
     return _proposalId;
   }
 
-  function submitPassQueueAndExecuteProposal(address _proposer, Proposal memory _proposal) public returns (uint256) {
-    uint256 _proposalId = _submitProposal(_proposer, _proposal);
-    _passQueueAndExecuteProposal(_proposal, _proposalId);
+  function submitPassQueueAndExecuteProposalWithRoll(address _proposer, Proposal memory _proposal)
+    public
+    returns (uint256)
+  {
+    uint256 _proposalId = submitProposalWithRoll(_proposer, _proposal);
+    passQueueAndExecuteProposalWithRoll(_proposal, _proposalId);
     return _proposalId;
   }
 
-  function _submitAndFailProposal(address _proposer, Proposal memory _proposal) public returns (uint256) {
-    uint256 _proposalId = _submitProposal(_proposer, _proposal);
-    _failProposal(_proposalId);
+  function passQueueAndExecuteProposalWithRoll(uint256 _proposalId, Proposal memory _proposal) public returns (uint256) {
+    passQueueAndExecuteProposalWithRoll(_proposal, _proposalId);
+    return _proposalId;
+  }
+
+  function submitAndFailProposal(address _proposer, Proposal memory _proposal) public returns (uint256) {
+    uint256 _proposalId = submitProposalWithRoll(_proposer, _proposal);
+    failProposalWithRoll(_proposalId);
     return _proposalId;
   }
 
   function getMajorDelegate(uint256 _index) external view returns (address) {
     return majorDelegates[_index];
   }
+
+  function executeQueuedProposal(Proposal memory _proposal) public {
+    uint256 _timeLockDelay = timelock.delay();
+    vm.warp(block.timestamp + _timeLockDelay + 1);
+    governor.execute(_proposal.targets, _proposal.values, _proposal.calldatas, keccak256(bytes(_proposal.description)));
+  }
+
+  function executeProposal(Proposal memory _proposal) public {
+    governor.execute(_proposal.targets, _proposal.values, _proposal.calldatas, keccak256(bytes(_proposal.description)));
+  }
+
   /* End CompoundGovernor-related helper methods */
 }

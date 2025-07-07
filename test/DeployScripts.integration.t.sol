@@ -70,6 +70,21 @@ contract DeployScriptsIntegrationTest is Test, DeployInput {
     return (address(timelockMultiAdminShim), upgradeRegressionManager, governorHelper, proposer);
   }
 
+  function onlyDeployShimAndURM() external returns (address, UpgradeRegressionManager, CompoundGovernorHelper, address) {
+    setUp();
+    _step1_deployShimAndURM();
+    return (address(timelockMultiAdminShim), upgradeRegressionManager, governorHelper, proposer);
+  }
+
+  function onlyProposeTransferTimelockAdminToShim(address _timelockMultiAdminShim)
+    external
+    returns (address, UpgradeRegressionManager, CompoundGovernorHelper, address)
+  {
+    _step2__proposeTransferTimelockAdminToShim(_timelockMultiAdminShim);
+    _step3_acceptAdminFromShim(_timelockMultiAdminShim);
+    return (address(timelockMultiAdminShim), upgradeRegressionManager, governorHelper, proposer);
+  }
+
   /*///////////////////////////////////////////////////////////////
                       Test Functions
   //////////////////////////////////////////////////////////////*/
@@ -96,7 +111,7 @@ contract DeployScriptsIntegrationTest is Test, DeployInput {
     CompoundGovernorHelper.Proposal memory proposal =
       CompoundGovernorHelper.Proposal(targets, values, calldatas, description);
 
-    governorHelper.submitPassQueueAndExecuteProposal(proposer, proposal);
+    governorHelper.submitPassQueueAndExecuteProposalWithRoll(proposer, proposal);
   }
 
   function _step3_acceptAdminFromShim(address _timelockMultiAdminShim) internal {
