@@ -33,7 +33,7 @@ interface IUpgradeRegressionManager {
 
   function guardian() external view returns (address);
 
-  function rollbackQueueWindow() external view returns (uint256);
+  function rollbackQueueableDuration() external view returns (uint256);
 
   function getRollback(uint256 _rollbackId) external view returns (Rollback memory);
 
@@ -71,7 +71,7 @@ interface IUpgradeRegressionManager {
 
   function setGuardian(address _newGuardian) external;
 
-  function setRollbackQueueWindow(uint256 _newRollbackQueueWindow) external;
+  function setRollbackQueueableDuration(uint256 _newRollbackQueueableDuration) external;
 
   function setAdmin(address _newAdmin) external;
 

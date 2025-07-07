@@ -32,8 +32,8 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @notice Thrown when a rollback does not exist.
   error UpgradeRegressionManager__NonExistentRollback(uint256 rollbackId);
 
-  /// @notice Thrown when an invalid rollback queue window is provided.
-  error UpgradeRegressionManager__InvalidRollbackQueueWindow();
+  /// @notice Thrown when an invalid rollback queueable duration is provided.
+  error UpgradeRegressionManager__InvalidRollbackQueueableDuration();
 
   /// @notice Thrown when the lengths of the parameters do not match.
   error UpgradeRegressionManager__MismatchedParameters();
@@ -91,10 +91,10 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @param newGuardian The new guardian.
   event GuardianSet(address indexed oldGuardian, address indexed newGuardian);
 
-  /// @notice Emitted when the rollback queue window is set.
-  /// @param oldRollbackQueueWindow The old rollback queue window.
-  /// @param newRollbackQueueWindow The new rollback queue window.
-  event RollbackQueueWindowSet(uint256 oldRollbackQueueWindow, uint256 newRollbackQueueWindow);
+  /// @notice Emitted when the rollback queueable duration is set.
+  /// @param oldRollbackQueueableDuration The old rollback queueable duration.
+  /// @param newRollbackQueueableDuration The new rollback queueable duration.
+  event RollbackQueueableDurationSet(uint256 oldRollbackQueueableDuration, uint256 newRollbackQueueableDuration);
 
   /// @notice Emitted when the admin is set.
   /// @param oldAdmin The old admin.
@@ -108,14 +108,17 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @notice Target for timelocked execution of rollback transactions.
   ITimelockTarget public immutable TARGET;
 
+  /// @notice The lower bound enforced for the rollbackQueueableDuration setting.
+  uint256 public immutable MIN_ROLLBACK_QUEUEABLE_DURATION;
+
   /// @notice Address that manages this contract.
   address public admin;
 
   /// @notice Address that can execute rollback transactions.
   address public guardian;
 
-  /// @notice Time window after a rollback is proposed during which it can be queued for execution.
-  uint256 public rollbackQueueWindow;
+  /// @notice The duration after a rollback is proposed during which it remains eligible to be queued for execution.
+  uint256 public rollbackQueueableDuration;
 
   /// @notice Rollback id to rollback data.
   mapping(uint256 rollbackId => Rollback) private rollbacks;
@@ -128,17 +131,29 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @param _target The target for timelocked execution of rollback transactions.
   /// @param _admin The address that manages this contract.
   /// @param _guardian The address that can execute rollback transactions.
-  /// @param _rollbackQueueWindow The time window after a rollback is proposed during which it can be queued for
+  /// @param _rollbackQueueableDuration The duration within which a proposed rollback remains eligible to be queued for
   /// execution.
-  constructor(ITimelockTarget _target, address _admin, address _guardian, uint256 _rollbackQueueWindow) {
+  /// @param _minRollbackQueueableDuration The lower bound enforced for the rollbackQueueableDuration setting.
+  constructor(
+    ITimelockTarget _target,
+    address _admin,
+    address _guardian,
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
+  ) {
+    if (_minRollbackQueueableDuration == 0) {
+      revert UpgradeRegressionManager__InvalidRollbackQueueableDuration();
+    }
+
     if (address(_target) == address(0)) {
       revert UpgradeRegressionManager__InvalidAddress();
     }
 
     TARGET = _target;
+    MIN_ROLLBACK_QUEUEABLE_DURATION = _minRollbackQueueableDuration;
 
     _setAdmin(_admin);
-    _setRollbackQueueWindow(_rollbackQueueWindow);
+    _setRollbackQueueableDuration(_rollbackQueueableDuration);
     _setGuardian(_guardian);
   }
 
@@ -181,7 +196,7 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
     }
 
     // Set the time before which the rollback can be queued for execution.
-    uint256 _expiresAt = block.timestamp + rollbackQueueWindow;
+    uint256 _expiresAt = block.timestamp + rollbackQueueableDuration;
     rollback.queueExpiresAt = SafeCast.toUint48(_expiresAt);
 
     emit RollbackProposed(_rollbackId, _expiresAt, _targets, _values, _calldatas, _description);
@@ -321,12 +336,12 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
     _setGuardian(_newGuardian);
   }
 
-  /// @notice Sets the rollback queue window.
-  /// @param _newRollbackQueueWindow The new rollback queue window.
+  /// @notice Sets the rollback queueable duration.
+  /// @param _newRollbackQueueableDuration The new rollback queueable duration.
   /// @dev Can only be called by the admin.
-  function setRollbackQueueWindow(uint256 _newRollbackQueueWindow) external {
+  function setRollbackQueueableDuration(uint256 _newRollbackQueueableDuration) external {
     _revertIfNotAdmin();
-    _setRollbackQueueWindow(_newRollbackQueueWindow);
+    _setRollbackQueueableDuration(_newRollbackQueueableDuration);
   }
 
   /// @notice Sets the admin.
@@ -406,15 +421,15 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
     guardian = _newGuardian;
   }
 
-  /// @notice Utility function to set the rollback queue window.
-  /// @param _newRollbackQueueWindow The new rollback queue window.
-  function _setRollbackQueueWindow(uint256 _newRollbackQueueWindow) internal {
-    if (_newRollbackQueueWindow == 0) {
-      revert UpgradeRegressionManager__InvalidRollbackQueueWindow();
+  /// @notice Utility function to set the rollback queueable duration.
+  /// @param _newRollbackQueueableDuration The new rollback queueable duration.
+  function _setRollbackQueueableDuration(uint256 _newRollbackQueueableDuration) internal {
+    if (_newRollbackQueueableDuration < MIN_ROLLBACK_QUEUEABLE_DURATION) {
+      revert UpgradeRegressionManager__InvalidRollbackQueueableDuration();
     }
 
-    emit RollbackQueueWindowSet(rollbackQueueWindow, _newRollbackQueueWindow);
-    rollbackQueueWindow = _newRollbackQueueWindow;
+    emit RollbackQueueableDurationSet(rollbackQueueableDuration, _newRollbackQueueableDuration);
+    rollbackQueueableDuration = _newRollbackQueueableDuration;
   }
 
   /// @notice Utility function to set the admin.
