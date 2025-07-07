@@ -274,6 +274,8 @@ The Governance Emergency Rollback system provides a secure, flexible, and backwa
 
 The architecture follows established patterns from OpenZeppelin Governor, ensuring consistency and familiarity for developers and auditors. The modular design allows for future enhancements while maintaining the core security model.
 
+**[Governance Upgrade Impact Analysis](docs/GOVERNANCE_UPGRADE_IMPACT.md)** - Detailed analysis of how the governance upgrade affects existing proposals at different lifecycle stages
+
 ## Development
 
 These contracts were built and tested with care by the team at [ScopeLift](https://scopelift.co).
