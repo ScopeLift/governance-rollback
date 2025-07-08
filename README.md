@@ -287,7 +287,7 @@ Clone the repo.
 Set up your .env file
 
 ```bash
-cp .env.template .env
+cp .env.example .env
 # edit the .env to fill in values
 ```
 
