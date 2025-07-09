@@ -59,7 +59,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
       feeGuardianWhenRollbackIsExecuted
     );
     // 2. Execute proposal using governance helper
-    govHelper.submitPassQueueAndExecuteProposal(proposer, proposal);
+    govHelper.submitPassQueueAndExecuteProposalWithRoll(proposer, proposal);
 
     // 3. Verify updated state
     assertEq(fakeProtocolContract.fee(), feeWhenProposalIsExecuted);
@@ -84,7 +84,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
     );
 
     // 2. Execute proposal using governance helper
-    govHelper.submitPassQueueAndExecuteProposal(proposer, proposal);
+    govHelper.submitPassQueueAndExecuteProposalWithRoll(proposer, proposal);
 
     // 3. Verify updated state
     assertEq(fakeProtocolContract.fee(), feeWhenProposalIsExecuted);
@@ -128,7 +128,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
 
     vm.deal(address(proposer), 1 ether);
     // 2. Execute proposal using governance helper
-    govHelper.submitPassQueueAndExecuteProposal(proposer, proposal);
+    govHelper.submitPassQueueAndExecuteProposalWithRoll(proposer, proposal);
 
     // Verify FakeProtocolContract received the ETH
     assertEq(address(fakeProtocolContract).balance, 1 ether);
@@ -164,7 +164,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
     );
 
     // 2. Execute proposal using governance helper
-    govHelper.submitPassQueueAndExecuteProposal(proposer, proposal);
+    govHelper.submitPassQueueAndExecuteProposalWithRoll(proposer, proposal);
 
     // 3. Verify updated state
     assertEq(fakeProtocolContract.fee(), feeWhenProposalIsExecuted);
@@ -220,7 +220,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
     );
 
     // 2. Execute proposal using governance helper
-    govHelper.submitPassQueueAndExecuteProposal(proposer, proposal);
+    govHelper.submitPassQueueAndExecuteProposalWithRoll(proposer, proposal);
 
     // 3. Generate rollback data
     (address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description) =
@@ -258,7 +258,7 @@ contract ProposeWithRollback is RollbackIntegrationTest {
     );
 
     // 2. Execute proposal using governance helper
-    govHelper.submitPassQueueAndExecuteProposal(proposer, proposal);
+    govHelper.submitPassQueueAndExecuteProposalWithRoll(proposer, proposal);
 
     // 3. Generate rollback data
     (address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description) =

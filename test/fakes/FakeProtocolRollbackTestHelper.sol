@@ -147,4 +147,32 @@ contract FakeProtocolRollbackTestHelper {
       description: "Proposal to set FakeProtocolContract update fee and fee guardian with ETH and emergency rollback capability"
     });
   }
+
+  function generateProposalWithoutRollback(uint256 _newFee, address _newFeeGuardian)
+    public
+    view
+    returns (CompoundGovernorHelper.Proposal memory _proposal)
+  {
+    // Generate the main proposal data (set new fee and fee guardian with ETH)
+    address[] memory _targets = new address[](2);
+    uint256[] memory _values = new uint256[](2);
+    bytes[] memory _calldatas = new bytes[](2);
+
+    // First transaction: set fee
+    _targets[0] = address(fakeProtocolContract);
+    _values[0] = 0;
+    _calldatas[0] = abi.encodeWithSelector(FakeProtocolContract.setFee.selector, _newFee);
+
+    // Second transaction: set fee guardian
+    _targets[1] = address(fakeProtocolContract);
+    _values[1] = 0;
+    _calldatas[1] = abi.encodeWithSelector(FakeProtocolContract.setFeeGuardian.selector, _newFeeGuardian);
+
+    _proposal = CompoundGovernorHelper.Proposal({
+      targets: _targets,
+      values: _values,
+      calldatas: _calldatas,
+      description: "Proposal to set FakeProtocolContract update fee and fee guardian with ETH"
+    });
+  }
 }
