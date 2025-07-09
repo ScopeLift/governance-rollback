@@ -4,9 +4,6 @@ pragma solidity ^0.8.30;
 // External Libraries
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 
-// Internal Libraries
-import {ITimelockTarget} from "interfaces/ITimelockTarget.sol";
-
 /// @notice Struct to store rollback data.
 /// @param queueExpiresAt The timestamp before which the rollback must be queued for execution.
 /// @param executableAt The timestamp after which the rollback can be executed.
@@ -22,12 +19,12 @@ struct Rollback {
   bool canceled;
 }
 
-interface IUpgradeRegressionManager {
+interface IURM {
   /*///////////////////////////////////////////////////////////////
                      Public Storage 
   //////////////////////////////////////////////////////////////*/
 
-  function TARGET() external view returns (ITimelockTarget);
+  function TARGET_TIMELOCK() external view returns (address);
 
   function admin() external view returns (address);
 
