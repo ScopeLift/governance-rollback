@@ -111,7 +111,8 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @notice Address that can execute rollback transactions.
   address public guardian;
 
-  /// @notice The duration after a rollback is proposed during which it remains eligible to be queued for execution.
+  /// @notice The duration after a rollback is proposed during which it remains eligible to be queued for execution (in
+  /// seconds).
   uint256 public rollbackQueueableDuration;
 
   /// @notice Rollback id to rollback data.
@@ -126,8 +127,9 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @param _admin The address that manages this contract.
   /// @param _guardian The address that can execute rollback transactions.
   /// @param _rollbackQueueableDuration The duration within which a proposed rollback remains eligible to be queued for
-  /// execution.
-  /// @param _minRollbackQueueableDuration The lower bound enforced for the rollbackQueueableDuration setting.
+  /// execution (in seconds).
+  /// @param _minRollbackQueueableDuration The lower bound enforced for the rollbackQueueableDuration setting (in
+  /// seconds).
   constructor(
     ITimelockTarget _target,
     address _admin,
@@ -330,7 +332,7 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   }
 
   /// @notice Sets the rollback queueable duration.
-  /// @param _newRollbackQueueableDuration The new rollback queueable duration.
+  /// @param _newRollbackQueueableDuration The new rollback queueable duration in seconds.
   /// @dev Can only be called by the admin.
   function setRollbackQueueableDuration(uint256 _newRollbackQueueableDuration) external {
     _revertIfNotAdmin();
@@ -415,7 +417,7 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   }
 
   /// @notice Utility function to set the rollback queueable duration.
-  /// @param _newRollbackQueueableDuration The new rollback queueable duration.
+  /// @param _newRollbackQueueableDuration The new rollback queueable duration (in seconds).
   function _setRollbackQueueableDuration(uint256 _newRollbackQueueableDuration) internal {
     if (_newRollbackQueueableDuration < MIN_ROLLBACK_QUEUEABLE_DURATION) {
       revert UpgradeRegressionManager__InvalidRollbackQueueableDuration();
