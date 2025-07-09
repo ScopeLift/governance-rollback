@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {ITimelockTarget} from "src/interfaces/ITimelockTarget.sol";
+import {ICompoundTimelockTarget} from "src/interfaces/ICompoundTimelockTarget.sol";
 
-contract MockTimelockTarget is ITimelockTarget {
+contract MockCompoundTargetTimelock is ICompoundTimelockTarget {
   // Struct for tracking function call parameters
   struct TimelockTransactionCall {
     address target;

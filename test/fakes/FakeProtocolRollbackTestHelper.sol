@@ -2,18 +2,18 @@
 pragma solidity ^0.8.30;
 
 import {FakeProtocolContract} from "test/fakes/FakeProtocolContract.sol";
-import {CompoundGovernorHelper} from "test/helpers/CompoundGovernorHelper.sol";
-import {IUpgradeRegressionManager} from "src/interfaces/IUpgradeRegressionManager.sol";
+import {Proposal} from "test/helpers/Proposal.sol";
+import {IURM} from "interfaces/IURM.sol";
 
 /// @title FakeProtocolRollbackTestHelper
 /// @notice Helper functions for testing rollback scenarios with FakeProtocolContract
 contract FakeProtocolRollbackTestHelper {
   FakeProtocolContract public fakeProtocolContract;
-  IUpgradeRegressionManager public upgradeRegressionManager;
+  IURM public urm;
 
-  constructor(FakeProtocolContract _fakeProtocolContract, IUpgradeRegressionManager _upgradeRegressionManager) {
+  constructor(FakeProtocolContract _fakeProtocolContract, IURM _urm) {
     fakeProtocolContract = _fakeProtocolContract;
-    upgradeRegressionManager = _upgradeRegressionManager;
+    urm = _urm;
   }
 
   /// @notice Generates rollback data for changing the fee and feeGuardian of FakeProtocolContract
@@ -46,14 +46,14 @@ contract FakeProtocolRollbackTestHelper {
     _description = "Emergency rollback for FakeProtocolContract";
   }
 
-  /// @notice Generates the rollback ID for a given set of parameters
+  /// @notice Generates the rollback id for a given set of parameters
   /// @param _rollbackFee The rollback fee to set
   /// @param _rollbackFeeGuardian The rollback fee guardian to set
   /// @return The rollback ID
   function getRollbackId(uint256 _rollbackFee, address _rollbackFeeGuardian) public view returns (uint256) {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas, string memory _description) =
       generateRollbackData(_rollbackFee, _rollbackFeeGuardian);
-    return upgradeRegressionManager.getRollbackId(_targets, _values, _calldatas, _description);
+    return urm.getRollbackId(_targets, _values, _calldatas, _description);
   }
 
   /// @notice Generates double-encoded URM propose data for rollback
@@ -76,19 +76,18 @@ contract FakeProtocolRollbackTestHelper {
     ) = generateRollbackData(_rollbackFee, _rollbackFeeGuardian);
 
     // Create the URM.propose() calldata
-    bytes memory _urmProposeCalldata = abi.encodeWithSelector(
-      IUpgradeRegressionManager.propose.selector, _rollbackTargets, _rollbackValues, _rollbackCalldatas, _description
-    );
+    bytes memory _urmProposeCalldata =
+      abi.encodeWithSelector(IURM.propose.selector, _rollbackTargets, _rollbackValues, _rollbackCalldatas, _description);
 
     // Create governance proposal data
-    _target = address(upgradeRegressionManager);
+    _target = address(urm);
     _value = 0;
     _calldata = _urmProposeCalldata;
 
     return (_target, _value, _calldata);
   }
 
-  /// @notice Generates a complete proposal with rollback in CompoundGovernorHelper.Proposal format
+  /// @notice Generates a complete proposal with rollback in Proposal format
   /// @param _newFee The new fee to set in the main proposal
   /// @param _newFeeGuardian The new fee guardian to set in the main proposal
   /// @param _rollbackFee The fee to set in the rollback (usually original fee)
@@ -99,11 +98,11 @@ contract FakeProtocolRollbackTestHelper {
     address _newFeeGuardian,
     uint256 _rollbackFee,
     address _rollbackFeeGuardian
-  ) public view returns (CompoundGovernorHelper.Proposal memory _proposal) {
+  ) public view returns (Proposal memory _proposal) {
     return generateProposalWithRollbackAndAmount(_newFee, _newFeeGuardian, 0, _rollbackFee, _rollbackFeeGuardian);
   }
 
-  /// @notice Generates a complete proposal with rollback and ETH amount in CompoundGovernorHelper.Proposal format
+  /// @notice Generates a complete proposal with rollback and ETH amount in Proposal format
   /// @param _newFee The new fee to set in the main proposal
   /// @param _newFeeGuardian The new fee guardian to set in the main proposal
   /// @param _amount The amount of ETH to send with the fee change
@@ -116,7 +115,7 @@ contract FakeProtocolRollbackTestHelper {
     uint256 _amount,
     uint256 _rollbackFee,
     address _rollbackFeeGuardian
-  ) public view returns (CompoundGovernorHelper.Proposal memory _proposal) {
+  ) public view returns (Proposal memory _proposal) {
     // Generate the main proposal data (set new fee and fee guardian with ETH)
     address[] memory _targets = new address[](3);
     uint256[] memory _values = new uint256[](3);
@@ -140,7 +139,7 @@ contract FakeProtocolRollbackTestHelper {
     _values[2] = _rollbackValue;
     _calldatas[2] = _rollbackCalldata;
 
-    _proposal = CompoundGovernorHelper.Proposal({
+    _proposal = Proposal({
       targets: _targets,
       values: _values,
       calldatas: _calldatas,
@@ -151,7 +150,7 @@ contract FakeProtocolRollbackTestHelper {
   function generateProposalWithoutRollback(uint256 _newFee, address _newFeeGuardian)
     public
     view
-    returns (CompoundGovernorHelper.Proposal memory _proposal)
+    returns (Proposal memory _proposal)
   {
     // Generate the main proposal data (set new fee and fee guardian with ETH)
     address[] memory _targets = new address[](2);
@@ -168,7 +167,7 @@ contract FakeProtocolRollbackTestHelper {
     _values[1] = 0;
     _calldatas[1] = abi.encodeWithSelector(FakeProtocolContract.setFeeGuardian.selector, _newFeeGuardian);
 
-    _proposal = CompoundGovernorHelper.Proposal({
+    _proposal = Proposal({
       targets: _targets,
       values: _values,
       calldatas: _calldatas,
