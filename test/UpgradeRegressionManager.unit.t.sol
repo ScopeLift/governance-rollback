@@ -17,11 +17,14 @@ contract UpgradeRegressionManagerTest is Test {
 
   address public guardian = makeAddr("guardian");
   address public admin = makeAddr("admin");
-  uint256 public rollbackQueueWindow = 1 days;
+  uint256 public rollbackQueueableDuration = 1 days;
+  uint256 public minRollbackQueueableDuration = 5 minutes;
 
   function setUp() external {
     timelockTarget = new MockTimelockTarget();
-    upgradeRegressionManager = new UpgradeRegressionManager(timelockTarget, admin, guardian, rollbackQueueWindow);
+    upgradeRegressionManager = new UpgradeRegressionManager(
+      timelockTarget, admin, guardian, rollbackQueueableDuration, minRollbackQueueableDuration
+    );
   }
 
   function _assumeSafeAdmin(address _admin) internal pure {
@@ -36,20 +39,36 @@ contract UpgradeRegressionManagerTest is Test {
     vm.assume(_timelockTarget != address(0));
   }
 
-  function _boundToRealisticRollbackQueueWindow(uint256 _rollbackQueueWindow) internal pure returns (uint256) {
-    return bound(_rollbackQueueWindow, 1 hours, 20 days);
+  function _boundToRealisticMinRollbackQueueableDuration(uint256 _minRollbackQueueableDuration)
+    internal
+    pure
+    returns (uint256)
+  {
+    return bound(_minRollbackQueueableDuration, 1 hours, 20 days);
+  }
+
+  function _boundToRealisticRollbackQueueableDuration(
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
+  ) internal pure returns (uint256) {
+    return bound(_rollbackQueueableDuration, _minRollbackQueueableDuration, 10 * 365 days);
   }
 
   function _assumeSafeInitParams(
     address _timelockTarget,
     address _admin,
     address _guardian,
-    uint256 _rollbackQueueWindow
-  ) internal pure returns (uint256) {
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
+  ) internal pure returns (uint256, uint256) {
     _assumeSafeTimelockTarget(_timelockTarget);
     _assumeSafeAdmin(_admin);
     _assumeSafeGuardian(_guardian);
-    return _boundToRealisticRollbackQueueWindow(_rollbackQueueWindow);
+    _minRollbackQueueableDuration = _boundToRealisticMinRollbackQueueableDuration(_minRollbackQueueableDuration);
+    return (
+      _minRollbackQueueableDuration,
+      _boundToRealisticRollbackQueueableDuration(_rollbackQueueableDuration, _minRollbackQueueableDuration)
+    );
   }
 
   function _proposeRollback(
@@ -95,93 +114,151 @@ contract Constructor is UpgradeRegressionManagerTest {
     address _timelockTarget,
     address _admin,
     address _guardian,
-    uint256 _rollbackQueueWindow
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
   ) external {
-    _rollbackQueueWindow = _assumeSafeInitParams(_timelockTarget, _admin, _guardian, _rollbackQueueWindow);
+    (_minRollbackQueueableDuration, _rollbackQueueableDuration) = _assumeSafeInitParams(
+      _timelockTarget, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
 
-    UpgradeRegressionManager _upgradeRegressionManager =
-      new UpgradeRegressionManager(ITimelockTarget(_timelockTarget), _admin, _guardian, _rollbackQueueWindow);
+    UpgradeRegressionManager _upgradeRegressionManager = new UpgradeRegressionManager(
+      ITimelockTarget(_timelockTarget), _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
 
     assertEq(address(_upgradeRegressionManager.TARGET()), _timelockTarget);
+    assertEq(_upgradeRegressionManager.MIN_ROLLBACK_QUEUEABLE_DURATION(), _minRollbackQueueableDuration);
     assertEq(_upgradeRegressionManager.admin(), _admin);
     assertEq(_upgradeRegressionManager.guardian(), _guardian);
-    assertEq(_upgradeRegressionManager.rollbackQueueWindow(), _rollbackQueueWindow);
+    assertEq(_upgradeRegressionManager.rollbackQueueableDuration(), _rollbackQueueableDuration);
   }
 
-  function testFuzz_EmitsRollbackQueueWindowSet(
+  function testFuzz_EmitsRollbackQueueableDurationSet(
     address _timelockTarget,
     address _admin,
     address _guardian,
-    uint256 _rollbackQueueWindow
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
   ) external {
-    _rollbackQueueWindow = _assumeSafeInitParams(_timelockTarget, _admin, _guardian, _rollbackQueueWindow);
+    (_minRollbackQueueableDuration, _rollbackQueueableDuration) = _assumeSafeInitParams(
+      _timelockTarget, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
 
     vm.expectEmit();
-    emit UpgradeRegressionManager.RollbackQueueWindowSet(0, _rollbackQueueWindow);
-    new UpgradeRegressionManager(ITimelockTarget(_timelockTarget), _admin, _guardian, _rollbackQueueWindow);
+    emit UpgradeRegressionManager.RollbackQueueableDurationSet(0, _rollbackQueueableDuration);
+    new UpgradeRegressionManager(
+      ITimelockTarget(_timelockTarget), _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
   }
 
   function testFuzz_EmitsGuardianSet(
     address _timelockTarget,
     address _admin,
     address _guardian,
-    uint256 _rollbackQueueWindow
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
   ) external {
-    _rollbackQueueWindow = _assumeSafeInitParams(_timelockTarget, _admin, _guardian, _rollbackQueueWindow);
+    (_minRollbackQueueableDuration, _rollbackQueueableDuration) = _assumeSafeInitParams(
+      _timelockTarget, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
 
     vm.expectEmit();
     emit UpgradeRegressionManager.GuardianSet(address(0), _guardian);
-    new UpgradeRegressionManager(ITimelockTarget(_timelockTarget), _admin, _guardian, _rollbackQueueWindow);
+    new UpgradeRegressionManager(
+      ITimelockTarget(_timelockTarget), _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
   }
 
   function testFuzz_RevertIf_TimelockTargetIsZeroAddress(
     address _admin,
     address _guardian,
-    uint256 _rollbackQueueWindow
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
   ) external {
     _assumeSafeAdmin(_admin);
     _assumeSafeGuardian(_guardian);
-    _rollbackQueueWindow = _boundToRealisticRollbackQueueWindow(_rollbackQueueWindow);
+    _minRollbackQueueableDuration = _boundToRealisticMinRollbackQueueableDuration(_minRollbackQueueableDuration);
+    _rollbackQueueableDuration =
+      _boundToRealisticRollbackQueueableDuration(_rollbackQueueableDuration, _minRollbackQueueableDuration);
 
     vm.expectRevert(UpgradeRegressionManager.UpgradeRegressionManager__InvalidAddress.selector);
-    new UpgradeRegressionManager(ITimelockTarget(address(0)), _admin, _guardian, _rollbackQueueWindow);
+    new UpgradeRegressionManager(
+      ITimelockTarget(address(0)), _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
   }
 
   function testFuzz_RevertIf_AdminIsZeroAddress(
     address _timelockTarget,
     address _guardian,
-    uint256 _rollbackQueueWindow
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
   ) external {
     _assumeSafeTimelockTarget(_timelockTarget);
     _assumeSafeGuardian(_guardian);
-    _rollbackQueueWindow = _boundToRealisticRollbackQueueWindow(_rollbackQueueWindow);
+    _minRollbackQueueableDuration = _boundToRealisticMinRollbackQueueableDuration(_minRollbackQueueableDuration);
+    _rollbackQueueableDuration =
+      _boundToRealisticRollbackQueueableDuration(_rollbackQueueableDuration, _minRollbackQueueableDuration);
 
     vm.expectRevert(UpgradeRegressionManager.UpgradeRegressionManager__InvalidAddress.selector);
-    new UpgradeRegressionManager(ITimelockTarget(_timelockTarget), address(0), _guardian, _rollbackQueueWindow);
+    new UpgradeRegressionManager(
+      ITimelockTarget(_timelockTarget), address(0), _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
   }
 
   function testFuzz_RevertIf_GuardianIsZeroAddress(
     address _timelockTarget,
     address _admin,
-    uint256 _rollbackQueueWindow
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
   ) external {
     _assumeSafeTimelockTarget(_timelockTarget);
     _assumeSafeAdmin(_admin);
-    _rollbackQueueWindow = _boundToRealisticRollbackQueueWindow(_rollbackQueueWindow);
+    _minRollbackQueueableDuration = _boundToRealisticMinRollbackQueueableDuration(_minRollbackQueueableDuration);
+    _rollbackQueueableDuration =
+      _boundToRealisticRollbackQueueableDuration(_rollbackQueueableDuration, _minRollbackQueueableDuration);
 
     vm.expectRevert(UpgradeRegressionManager.UpgradeRegressionManager__InvalidAddress.selector);
-    new UpgradeRegressionManager(ITimelockTarget(_timelockTarget), _admin, address(0), _rollbackQueueWindow);
+    new UpgradeRegressionManager(
+      ITimelockTarget(_timelockTarget), _admin, address(0), _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
   }
 
-  function testFuzz_RevertIf_RollbackQueueWindowIsZero(address _timelockTarget, address _admin, address _guardian)
-    external
-  {
+  function testFuzz_RevertIf_RollbackQueueableDurationIsLessThanMinRollbackQueueableDuration(
+    address _timelockTarget,
+    address _admin,
+    address _guardian,
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
+  ) external {
     _assumeSafeTimelockTarget(_timelockTarget);
     _assumeSafeAdmin(_admin);
     _assumeSafeGuardian(_guardian);
+    _minRollbackQueueableDuration = _boundToRealisticMinRollbackQueueableDuration(_minRollbackQueueableDuration);
 
-    vm.expectRevert(UpgradeRegressionManager.UpgradeRegressionManager__InvalidRollbackQueueWindow.selector);
-    new UpgradeRegressionManager(ITimelockTarget(_timelockTarget), _admin, _guardian, 0);
+    // The rollback queueable duration is bound to be less than the min rollback queueable duration.
+    uint256 _invalidRollbackQueueableDuration = bound(_rollbackQueueableDuration, 0, _minRollbackQueueableDuration - 1);
+
+    vm.expectRevert(UpgradeRegressionManager.UpgradeRegressionManager__InvalidRollbackQueueableDuration.selector);
+    new UpgradeRegressionManager(
+      ITimelockTarget(_timelockTarget),
+      _admin,
+      _guardian,
+      _invalidRollbackQueueableDuration,
+      _minRollbackQueueableDuration
+    );
+  }
+
+  function testFuzz_RevertIf_MinRollbackQueueableDurationIsZero(
+    address _timelockTarget,
+    address _admin,
+    address _guardian,
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
+  ) external {
+    (, _rollbackQueueableDuration) = _assumeSafeInitParams(
+      _timelockTarget, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
+    vm.expectRevert(UpgradeRegressionManager.UpgradeRegressionManager__InvalidRollbackQueueableDuration.selector);
+    new UpgradeRegressionManager(ITimelockTarget(_timelockTarget), _admin, _guardian, _rollbackQueueableDuration, 0);
   }
 }
 
@@ -198,11 +275,11 @@ contract GetRollback is UpgradeRegressionManagerTest {
     _proposeRollback(_targets, _values, _calldatas, _description);
 
     uint256 _rollbackId = upgradeRegressionManager.getRollbackId(_targets, _values, _calldatas, _description);
-    uint256 _rollbackQueueWindow = upgradeRegressionManager.rollbackQueueWindow();
+    uint256 _rollbackQueueableDuration = upgradeRegressionManager.rollbackQueueableDuration();
 
     Rollback memory _rollback = upgradeRegressionManager.getRollback(_rollbackId);
 
-    assertEq(_rollback.queueExpiresAt, block.timestamp + _rollbackQueueWindow);
+    assertEq(_rollback.queueExpiresAt, block.timestamp + _rollbackQueueableDuration);
     assertEq(_rollback.executableAt, 0);
     assertEq(_rollback.canceled, false);
     assertEq(_rollback.executed, false);
@@ -240,7 +317,7 @@ contract Propose is UpgradeRegressionManagerTest {
 
     vm.expectEmit();
     emit UpgradeRegressionManager.RollbackProposed(
-      _computedRollbackId, block.timestamp + rollbackQueueWindow, _targets, _values, _calldatas, _description
+      _computedRollbackId, block.timestamp + rollbackQueueableDuration, _targets, _values, _calldatas, _description
     );
 
     vm.prank(admin);
@@ -263,7 +340,7 @@ contract Propose is UpgradeRegressionManagerTest {
 
     Rollback memory _rollback = upgradeRegressionManager.getRollback(_computedRollbackId);
 
-    assertEq(_rollback.queueExpiresAt, block.timestamp + rollbackQueueWindow);
+    assertEq(_rollback.queueExpiresAt, block.timestamp + rollbackQueueableDuration);
     assertEq(_rollback.executableAt, 0);
     assertEq(_rollback.canceled, false);
     assertEq(_rollback.executed, false);
@@ -287,25 +364,28 @@ contract Propose is UpgradeRegressionManagerTest {
     assertEq(uint8(_state), uint8(ProposalState.Pending));
   }
 
-  function testFuzz_SetsTheExpirationTimeBasedOnRollbackQueueWindow(
+  function testFuzz_SetsTheExpirationTimeBasedOnRollbackQueueableDuration(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
     string memory _description,
-    uint256 _rollbackQueueWindow
+    uint256 _rollbackQueueableDuration
   ) external {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
 
-    _rollbackQueueWindow = _boundToRealisticRollbackQueueWindow(_rollbackQueueWindow);
+    _rollbackQueueableDuration =
+      _boundToRealisticRollbackQueueableDuration(_rollbackQueueableDuration, minRollbackQueueableDuration);
 
     vm.startPrank(admin);
-    // Set the rollback queue window to the new value.
-    upgradeRegressionManager.setRollbackQueueWindow(_rollbackQueueWindow);
+    // Set the rollback queueable duration to the new value.
+    upgradeRegressionManager.setRollbackQueueableDuration(_rollbackQueueableDuration);
     uint256 _rollbackId = upgradeRegressionManager.propose(_targets, _values, _calldatas, _description);
     vm.stopPrank();
 
-    assertEq(upgradeRegressionManager.getRollback(_rollbackId).queueExpiresAt, block.timestamp + _rollbackQueueWindow);
+    assertEq(
+      upgradeRegressionManager.getRollback(_rollbackId).queueExpiresAt, block.timestamp + _rollbackQueueableDuration
+    );
   }
 
   function testFuzz_RevertIf_RollbackAlreadyExists(
@@ -382,7 +462,7 @@ contract Queue is UpgradeRegressionManagerTest {
 
     _proposeRollback(_targets, _values, _calldatas, _description);
 
-    _delay = bound(_delay, 0, rollbackQueueWindow - 1);
+    _delay = bound(_delay, 0, rollbackQueueableDuration - 1);
     vm.warp(block.timestamp + _delay);
 
     vm.prank(guardian);
@@ -535,8 +615,8 @@ contract Queue is UpgradeRegressionManagerTest {
     ProposalState _initialState = upgradeRegressionManager.state(_rollbackId);
     assertEq(uint8(_initialState), uint8(ProposalState.Pending));
 
-    // Warp to exactly when the queue window expires
-    vm.warp(block.timestamp + rollbackQueueWindow);
+    // Warp to exactly when the rollback queue duration expires
+    vm.warp(block.timestamp + rollbackQueueableDuration);
 
     // Verify the rollback is now in expired state
     ProposalState _expiredState = upgradeRegressionManager.state(_rollbackId);
@@ -649,7 +729,7 @@ contract Cancel is UpgradeRegressionManagerTest {
 
     Rollback memory _rollback = upgradeRegressionManager.getRollback(_rollbackId);
 
-    assertEq(_rollback.queueExpiresAt, block.timestamp + rollbackQueueWindow);
+    assertEq(_rollback.queueExpiresAt, block.timestamp + rollbackQueueableDuration);
     assertEq(_rollback.executableAt, block.timestamp + timelockTarget.delay());
     assertEq(_rollback.canceled, true);
     assertEq(_rollback.executed, false);
@@ -1035,12 +1115,12 @@ contract State is UpgradeRegressionManagerTest {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
 
-    // Bound time offset to be within the queue window
-    _timeOffset = bound(_timeOffset, 0, rollbackQueueWindow - 1);
+    // Bound time offset to be within the rollback queue duration
+    _timeOffset = bound(_timeOffset, 0, rollbackQueueableDuration - 1);
 
     uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
 
-    // Warp to a time within the expiry window
+    // Warp to a time within the expiry duration
     vm.warp(block.timestamp + _timeOffset);
 
     ProposalState _state = upgradeRegressionManager.state(_rollbackId);
@@ -1057,12 +1137,12 @@ contract State is UpgradeRegressionManagerTest {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
 
-    // Bound time offset to be after the queue window
-    _timeOffset = bound(_timeOffset, rollbackQueueWindow, rollbackQueueWindow + 30 days);
+    // Bound time offset to be after the rollback queue duration
+    _timeOffset = bound(_timeOffset, rollbackQueueableDuration, rollbackQueueableDuration + 30 days);
 
     uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
 
-    // Warp to a time after the expiry window
+    // Warp to a time after the rollback queue duration
     vm.warp(block.timestamp + _timeOffset);
 
     ProposalState _state = upgradeRegressionManager.state(_rollbackId);
@@ -1084,15 +1164,15 @@ contract State is UpgradeRegressionManagerTest {
     ProposalState _initialState = upgradeRegressionManager.state(_rollbackId);
     assertEq(uint8(_initialState), uint8(ProposalState.Pending));
 
-    // Warp to exactly when the queue window expires
-    vm.warp(block.timestamp + rollbackQueueWindow);
+    // Warp to exactly when the rollback queue duration expires
+    vm.warp(block.timestamp + rollbackQueueableDuration);
 
     // Verify the rollback is now in expired state at the exact boundary
     ProposalState _exactExpirationState = upgradeRegressionManager.state(_rollbackId);
     assertEq(uint8(_exactExpirationState), uint8(ProposalState.Expired));
 
     // Warp 1 second before expiration to verify it's still pending
-    vm.warp(block.timestamp - rollbackQueueWindow + rollbackQueueWindow - 1);
+    vm.warp(block.timestamp - rollbackQueueableDuration + rollbackQueueableDuration - 1);
     ProposalState _beforeExpirationState = upgradeRegressionManager.state(_rollbackId);
     assertEq(uint8(_beforeExpirationState), uint8(ProposalState.Pending));
 
@@ -1117,7 +1197,7 @@ contract State is UpgradeRegressionManagerTest {
     // Bound time offset to be before the executable time
     _timeOffset = bound(_timeOffset, 0, timelockTarget.delay() - 1);
 
-    // Warp to a time before the executable window
+    // Warp to a time before the executable duration
     vm.warp(block.timestamp + _timeOffset);
 
     ProposalState _state = upgradeRegressionManager.state(_rollbackId);
@@ -1139,7 +1219,7 @@ contract State is UpgradeRegressionManagerTest {
     // Bound time offset to be after the executable time
     _timeOffset = bound(_timeOffset, timelockTarget.delay(), timelockTarget.delay() + 30 days);
 
-    // Warp to a time after the executable window
+    // Warp to a time after the executable duration
     vm.warp(block.timestamp + _timeOffset);
 
     ProposalState _state = upgradeRegressionManager.state(_rollbackId);
@@ -1272,37 +1352,44 @@ contract SetGuardian is UpgradeRegressionManagerTest {
   }
 }
 
-contract SetRollbackQueueWindow is UpgradeRegressionManagerTest {
-  function test_SetsRollbackQueueWindow(uint256 _newRollbackQueueWindow) external {
-    _newRollbackQueueWindow = _boundToRealisticRollbackQueueWindow(_newRollbackQueueWindow);
+contract SetRollbackQueueableDuration is UpgradeRegressionManagerTest {
+  function test_SetsRollbackQueueableDuration(uint256 _newRollbackQueueableDuration) external {
+    _newRollbackQueueableDuration =
+      _boundToRealisticRollbackQueueableDuration(_newRollbackQueueableDuration, minRollbackQueueableDuration);
 
     vm.prank(admin);
-    upgradeRegressionManager.setRollbackQueueWindow(_newRollbackQueueWindow);
+    upgradeRegressionManager.setRollbackQueueableDuration(_newRollbackQueueableDuration);
 
-    assertEq(upgradeRegressionManager.rollbackQueueWindow(), _newRollbackQueueWindow);
+    assertEq(upgradeRegressionManager.rollbackQueueableDuration(), _newRollbackQueueableDuration);
   }
 
-  function testFuzz_EmitsRollbackQueueWindowSet(uint256 _newRollbackQueueWindow) external {
-    _newRollbackQueueWindow = _boundToRealisticRollbackQueueWindow(_newRollbackQueueWindow);
+  function testFuzz_EmitsRollbackQueueableDurationSet(uint256 _newRollbackQueueableDuration) external {
+    _newRollbackQueueableDuration =
+      _boundToRealisticRollbackQueueableDuration(_newRollbackQueueableDuration, minRollbackQueueableDuration);
 
     vm.expectEmit();
-    emit UpgradeRegressionManager.RollbackQueueWindowSet(rollbackQueueWindow, _newRollbackQueueWindow);
+    emit UpgradeRegressionManager.RollbackQueueableDurationSet(rollbackQueueableDuration, _newRollbackQueueableDuration);
     vm.prank(admin);
-    upgradeRegressionManager.setRollbackQueueWindow(_newRollbackQueueWindow);
+    upgradeRegressionManager.setRollbackQueueableDuration(_newRollbackQueueableDuration);
   }
 
-  function testFuzz_RevertIf_CallerIsNotAdmin(address _caller, uint256 _newRollbackQueueWindow) external {
+  function testFuzz_RevertIf_CallerIsNotAdmin(address _caller, uint256 _newRollbackQueueableDuration) external {
     vm.assume(_caller != admin);
 
     vm.expectRevert(UpgradeRegressionManager.UpgradeRegressionManager__Unauthorized.selector);
     vm.prank(_caller);
-    upgradeRegressionManager.setRollbackQueueWindow(_newRollbackQueueWindow);
+    upgradeRegressionManager.setRollbackQueueableDuration(_newRollbackQueueableDuration);
   }
 
-  function test_RevertIf_NewRollbackQueueWindowIsZero() external {
-    vm.expectRevert(UpgradeRegressionManager.UpgradeRegressionManager__InvalidRollbackQueueWindow.selector);
+  function test_RevertIf_NewRollbackQueueableDurationIsLessThanMinRollbackQueueableDuration(
+    uint256 _newRollbackQueueableDuration
+  ) external {
+    uint256 _invalidRollbackQueueableDuration =
+      bound(_newRollbackQueueableDuration, 0, minRollbackQueueableDuration - 1);
+
+    vm.expectRevert(UpgradeRegressionManager.UpgradeRegressionManager__InvalidRollbackQueueableDuration.selector);
     vm.prank(admin);
-    upgradeRegressionManager.setRollbackQueueWindow(0);
+    upgradeRegressionManager.setRollbackQueueableDuration(_invalidRollbackQueueableDuration);
   }
 }
 
