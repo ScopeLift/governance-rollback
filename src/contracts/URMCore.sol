@@ -2,11 +2,10 @@
 pragma solidity ^0.8.30;
 
 // Internal Libraries
-import {ITimelockTarget} from "interfaces/ITimelockTarget.sol";
-import {IUpgradeRegressionManager} from "interfaces/IUpgradeRegressionManager.sol";
+import {IURM} from "interfaces/IURM.sol";
 import {Rollback, ProposalState} from "types/GovernanceTypes.sol";
 
-/// @title Upgrade Regression Manager
+/// @title Upgrade Rollback Manager Core
 /// @author [ScopeLift](https://scopelift.co)
 /// @notice Manages the lifecycle of rollback proposals, allowing the admin to propose, and the guardian to queue,
 /// cancel, or execute rollback transactions.
@@ -15,37 +14,37 @@ import {Rollback, ProposalState} from "types/GovernanceTypes.sol";
 ///      - Guardian queues them for execution within a specified window
 ///      - Guardian later executes or cancels the queued rollback.
 ///      - On queuing / cancelling / executing, the transactions are sent to TimelockTarget.
-contract UpgradeRegressionManager is IUpgradeRegressionManager {
+abstract contract URMCore is IURM {
   /*///////////////////////////////////////////////////////////////
                           Errors
   //////////////////////////////////////////////////////////////*/
 
   /// @notice Thrown when an unauthorized caller attempts perform an action.
-  error UpgradeRegressionManager__Unauthorized();
+  error URM__Unauthorized();
 
   /// @notice Thrown when an invalid address is provided.
-  error UpgradeRegressionManager__InvalidAddress();
+  error URM__InvalidAddress();
 
   /// @notice Thrown when an invalid rollback queueable duration is provided.
-  error UpgradeRegressionManager__InvalidRollbackQueueableDuration();
+  error URM__InvalidRollbackQueueableDuration();
 
   /// @notice Thrown when the lengths of the parameters do not match.
-  error UpgradeRegressionManager__MismatchedParameters();
+  error URM__MismatchedParameters();
 
   /// @notice Thrown when a rollback is not proposed or already queued.
-  error UpgradeRegressionManager__NotQueueable(uint256 rollbackId);
+  error URM__NotQueueable(uint256 rollbackId);
 
   /// @notice Thrown when a rollback is not queued for execution.
-  error UpgradeRegressionManager__NotQueued(uint256 rollbackId);
+  error URM__NotQueued(uint256 rollbackId);
 
   /// @notice Thrown when a rollback queue has expired.
-  error UpgradeRegressionManager__Expired(uint256 rollbackId);
+  error URM__Expired(uint256 rollbackId);
 
   /// @notice Thrown when a rollback's execution time has not yet arrived.
-  error UpgradeRegressionManager__ExecutionTooEarly(uint256 rollbackId);
+  error URM__ExecutionTooEarly(uint256 rollbackId);
 
   /// @notice Thrown when a rollback already exists.
-  error UpgradeRegressionManager__AlreadyExists(uint256 rollbackId);
+  error URM__AlreadyExists(uint256 rollbackId);
 
   /*///////////////////////////////////////////////////////////////
                           Events
@@ -100,7 +99,7 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   //////////////////////////////////////////////////////////////*/
 
   /// @notice Target for timelocked execution of rollback transactions.
-  ITimelockTarget public immutable TARGET;
+  address public immutable TARGET;
 
   /// @notice The lower bound enforced for the rollbackQueueableDuration setting.
   uint256 public immutable MIN_ROLLBACK_QUEUEABLE_DURATION;
@@ -122,7 +121,7 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
                           Constructor
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Initializes the UpgradeRegressionManager.
+  /// @notice Initializes the URM.
   /// @param _target The target for timelocked execution of rollback transactions.
   /// @param _admin The address that manages this contract.
   /// @param _guardian The address that can execute rollback transactions.
@@ -131,18 +130,18 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @param _minRollbackQueueableDuration The lower bound enforced for the rollbackQueueableDuration setting (in
   /// seconds).
   constructor(
-    ITimelockTarget _target,
+    address _target,
     address _admin,
     address _guardian,
     uint256 _rollbackQueueableDuration,
     uint256 _minRollbackQueueableDuration
   ) {
     if (_minRollbackQueueableDuration == 0) {
-      revert UpgradeRegressionManager__InvalidRollbackQueueableDuration();
+      revert URM__InvalidRollbackQueueableDuration();
     }
 
     if (address(_target) == address(0)) {
-      revert UpgradeRegressionManager__InvalidAddress();
+      revert URM__InvalidAddress();
     }
 
     TARGET = _target;
@@ -188,7 +187,7 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
 
     // Revert if the rollback already exists.
     if (_getState(_rollback) != ProposalState.Unknown) {
-      revert UpgradeRegressionManager__AlreadyExists(_rollbackId);
+      revert URM__AlreadyExists(_rollbackId);
     }
 
     // Set the time before which the rollback can be queued for execution.
@@ -226,19 +225,17 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
     if (_state != ProposalState.Pending) {
       // Custom revert if the rollback queue has expired.
       if (_state == ProposalState.Expired) {
-        revert UpgradeRegressionManager__Expired(_rollbackId);
+        revert URM__Expired(_rollbackId);
       }
-      revert UpgradeRegressionManager__NotQueueable(_rollbackId);
+      revert URM__NotQueueable(_rollbackId);
     }
 
     // Set the time after which the queued rollback can be executed.
-    uint256 _eta = block.timestamp + TARGET.delay();
+    uint256 _eta = block.timestamp + _delay();
     _rollback.executableAt = _eta;
 
-    // Queue the rollback transactions.
-    for (uint256 _i = 0; _i < _targets.length; _i++) {
-      TARGET.queueTransaction(_targets[_i], _values[_i], "", _calldatas[_i], _eta);
-    }
+    // Queue the rollback to the timelock target.
+    _queue(_targets, _values, _calldatas, _description);
 
     emit RollbackQueued(_rollbackId, _eta);
   }
@@ -268,13 +265,11 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
 
     // Revert if the rollback has been queued or is ready to be executed.
     if (_state != ProposalState.Queued && _state != ProposalState.Active) {
-      revert UpgradeRegressionManager__NotQueued(_rollbackId);
+      revert URM__NotQueued(_rollbackId);
     }
 
-    // Cancel the rollback transactions.
-    for (uint256 _i = 0; _i < _targets.length; _i++) {
-      TARGET.cancelTransaction(_targets[_i], _values[_i], "", _calldatas[_i], _rollback.executableAt);
-    }
+    // Cancel the rollback transactions on the timelock target.
+    _cancel(_targets, _values, _calldatas, _description);
 
     _rollback.canceled = true;
 
@@ -308,15 +303,13 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
     if (_state != ProposalState.Active) {
       // Custom revert if the rollback is queued for execution but the execution time has not arrived.
       if (_state == ProposalState.Queued) {
-        revert UpgradeRegressionManager__ExecutionTooEarly(_rollbackId);
+        revert URM__ExecutionTooEarly(_rollbackId);
       }
-      revert UpgradeRegressionManager__NotQueued(_rollbackId);
+      revert URM__NotQueued(_rollbackId);
     }
 
-    // Execute the rollback.
-    for (uint256 _i = 0; _i < _targets.length; _i++) {
-      TARGET.executeTransaction(_targets[_i], _values[_i], "", _calldatas[_i], _rollback.executableAt);
-    }
+    // Execute the rollback on the timelock target.
+    _execute(_targets, _values, _calldatas, _description);
 
     _rollback.executed = true;
 
@@ -365,7 +358,7 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
     bytes[] memory _calldatas,
     string memory _description
   ) public pure returns (uint256) {
-    return uint256(keccak256(abi.encode(_targets, _values, _calldatas, _description)));
+    return _getRollbackId(_targets, _values, _calldatas, _description);
   }
 
   /// @notice Returns the current state of a proposed rollback by its ID.
@@ -381,14 +374,14 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @notice Reverts if the caller is not the admin.
   function _revertIfNotAdmin() internal view {
     if (msg.sender != admin) {
-      revert UpgradeRegressionManager__Unauthorized();
+      revert URM__Unauthorized();
     }
   }
 
   /// @notice Reverts if the caller is not the guardian.
   function _revertIfNotGuardian() internal view {
     if (msg.sender != guardian) {
-      revert UpgradeRegressionManager__Unauthorized();
+      revert URM__Unauthorized();
     }
   }
 
@@ -401,7 +394,7 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
     pure
   {
     if (_targets.length != _values.length || _targets.length != _calldatas.length) {
-      revert UpgradeRegressionManager__MismatchedParameters();
+      revert URM__MismatchedParameters();
     }
   }
 
@@ -409,7 +402,7 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @param _newGuardian The new guardian.
   function _setGuardian(address _newGuardian) internal {
     if (_newGuardian == address(0)) {
-      revert UpgradeRegressionManager__InvalidAddress();
+      revert URM__InvalidAddress();
     }
 
     emit GuardianSet(guardian, _newGuardian);
@@ -420,7 +413,7 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @param _newRollbackQueueableDuration The new rollback queueable duration (in seconds).
   function _setRollbackQueueableDuration(uint256 _newRollbackQueueableDuration) internal {
     if (_newRollbackQueueableDuration < MIN_ROLLBACK_QUEUEABLE_DURATION) {
-      revert UpgradeRegressionManager__InvalidRollbackQueueableDuration();
+      revert URM__InvalidRollbackQueueableDuration();
     }
 
     emit RollbackQueueableDurationSet(rollbackQueueableDuration, _newRollbackQueueableDuration);
@@ -431,7 +424,7 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
   /// @param _newAdmin The new admin.
   function _setAdmin(address _newAdmin) internal {
     if (_newAdmin == address(0)) {
-      revert UpgradeRegressionManager__InvalidAddress();
+      revert URM__InvalidAddress();
     }
 
     emit AdminSet(admin, _newAdmin);
@@ -484,4 +477,61 @@ contract UpgradeRegressionManager is IUpgradeRegressionManager {
     // Rollback is proposed but not queued for execution.
     return ProposalState.Pending;
   }
+
+  /*///////////////////////////////////////////////////////////////
+                      Target Interaction Hooks
+  //////////////////////////////////////////////////////////////*/
+
+  /// @notice Returns the rollback ID for a given set of parameters.
+  /// @param _targets The targets of the transactions.
+  /// @param _values The values of the transactions.
+  /// @param _calldatas The calldatas of the transactions.
+  /// @param _description The description of the rollback.
+  /// @return The rollback ID.
+  function _getRollbackId(
+    address[] memory _targets,
+    uint256[] memory _values,
+    bytes[] memory _calldatas,
+    string memory _description
+  ) internal pure returns (uint256);
+
+  /// @notice Returns the delay of the timelock target.
+  /// @return The delay of the timelock target.
+  function _delay() internal view virtual returns (uint256);
+
+  /// @notice Queues a rollback to the timelock target.
+  /// @param _targets The targets of the transactions.
+  /// @param _values The values of the transactions.
+  /// @param _calldatas The calldatas of the transactions.
+  /// @param _description The description of the rollback.
+  function _queue(
+    address[] memory _targets,
+    uint256[] memory _values,
+    bytes[] memory _calldatas,
+    string memory _description
+  ) internal;
+
+  /// @notice Cancels a rollback on the timelock target.
+  /// @param _targets The targets of the transactions.
+  /// @param _values The values of the transactions.
+  /// @param _calldatas The calldatas of the transactions.
+  /// @param _description The description of the rollback.
+  function _cancel(
+    address[] memory _targets,
+    uint256[] memory _values,
+    bytes[] memory _calldatas,
+    string memory _description
+  ) internal virtual;
+
+  /// @notice Executes a rollback on the timelock target.
+  /// @param _targets The targets of the transactions.
+  /// @param _values The values of the transactions.
+  /// @param _calldatas The calldatas of the transactions.
+  /// @param _description The description of the rollback.
+  function _execute(
+    address[] memory _targets,
+    uint256[] memory _values,
+    bytes[] memory _calldatas,
+    string memory _description
+  ) internal virtual;
 }
