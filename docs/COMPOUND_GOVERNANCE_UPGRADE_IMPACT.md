@@ -1,4 +1,4 @@
-# Governance Upgrade Impact Analysis
+# Compound Governance Upgrade Impact Analysis
 
 > **⚠️ Important**: This document analyzes the impact of upgrading to the TimelockMultiAdminShim on existing governance proposals at various stages of their lifecycle.
 
