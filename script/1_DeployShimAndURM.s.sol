@@ -10,21 +10,20 @@ import {Script} from "forge-std/Script.sol";
 // Internal imports
 import {DeployInput} from "script/DeployInput.sol";
 import {BaseLogger} from "script/BaseLogger.sol";
-import {ITimelockTarget} from "src/interfaces/ITimelockTarget.sol";
 import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
-import {UpgradeRegressionManager} from "src/contracts/UpgradeRegressionManager.sol";
+import {URMCompoundTimelock} from "src/contracts/urm/URMCompoundTimelock.sol";
 
 /// @title DeployShimAndURM
-/// @notice Script to deploy the TimelockMultiAdminShim and UpgradeRegressionManager contracts
+/// @notice Script to deploy the TimelockMultiAdminShim and URMCompoundTimelock contracts
 /// @dev This script deploys both contracts with the correct configuration
-contract DeployShimAndURM is Script, BaseLogger, DeployInput {
+contract DeployShimAndURMCompound is Script, BaseLogger, DeployInput {
   function _computeURMAddress() internal view returns (address) {
     address deployer = tx.origin;
     uint256 nextNonce = vm.getNonce(deployer) + 1;
     return vm.computeCreateAddress(deployer, nextNonce);
   }
 
-  function run() public returns (TimelockMultiAdminShim, UpgradeRegressionManager) {
+  function run() public returns (TimelockMultiAdminShim, URMCompoundTimelock) {
     vm.startBroadcast();
 
     // Compute the URM address
@@ -37,8 +36,8 @@ contract DeployShimAndURM is Script, BaseLogger, DeployInput {
       _executors // executors are the compute URM address
     );
 
-    UpgradeRegressionManager upgradeRegressionManager = new UpgradeRegressionManager(
-      ITimelockTarget(address(timelockMultiAdminShim)), // Target is the shim address
+    URMCompoundTimelock urm = new URMCompoundTimelock(
+      address(timelockMultiAdminShim), // Target is the shim address
       COMPOUND_TIMELOCK, // admin is the compound timelock
       GUARDIAN, // Address that can queue, cancel and execute rollback
       ROLLBACK_QUEUEABLE_DURATION, // Duration after a rollback proposal during which it can be queued for execution
@@ -48,14 +47,14 @@ contract DeployShimAndURM is Script, BaseLogger, DeployInput {
     vm.stopBroadcast();
 
     _log("TimelockMultiAdminShim", address(timelockMultiAdminShim));
-    _log("UpgradeRegressionManager", address(upgradeRegressionManager));
+    _log("URMCompoundTimelock", address(urm));
 
-    if (_executors[0] != address(upgradeRegressionManager)) {
-      _log("URM address", address(upgradeRegressionManager));
+    if (_executors[0] != address(urm)) {
+      _log("URM address", address(urm));
       _log("Computed URM address", _executors[0]);
       revert("URM is not the first executor. Please check computed URM.");
     }
 
-    return (timelockMultiAdminShim, upgradeRegressionManager);
+    return (timelockMultiAdminShim, urm);
   }
 }
