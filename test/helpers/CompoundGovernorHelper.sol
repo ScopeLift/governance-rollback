@@ -6,6 +6,7 @@ import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompou
 
 // Internal imports
 import {DeployInput} from "script/DeployInput.sol";
+import {Proposal} from "test/helpers/Proposal.sol";
 
 interface ICompoundGovernor {
   function timelock() external view returns (address);
@@ -43,13 +44,6 @@ interface ICompoundGovernor {
 }
 
 contract CompoundGovernorHelper is Test, DeployInput {
-  struct Proposal {
-    address[] targets;
-    uint256[] values;
-    bytes[] calldatas;
-    string description;
-  }
-
   ICompoundGovernor public governor;
   ICompoundTimelock public timelock;
   address public whitelistGuardian;

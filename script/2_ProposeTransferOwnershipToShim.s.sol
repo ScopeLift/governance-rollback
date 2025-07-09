@@ -4,7 +4,7 @@
 pragma solidity 0.8.30;
 
 // External imports
-import {IGovernor} from "lib/openzeppelin-contracts/contracts/governance/IGovernor.sol";
+import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 import {Script} from "forge-std/Script.sol";
 
 // Internal imports
