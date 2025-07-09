@@ -3,13 +3,13 @@ pragma solidity ^0.8.30;
 
 import {Script} from "forge-std/Script.sol";
 import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
-import {DeployInput} from "script/DeployInput.sol";
+import {URMCompoundDeployInput} from "script/URMCompoundDeployInput.sol";
 import {BaseLogger} from "script/BaseLogger.sol";
 
 /// @title AcceptAdmin
 /// @notice Script to accept the admin role from the TimelockMultiAdminShim
 /// @dev This script calls acceptAdmin on the legacy Compound-style Timelock
-contract AcceptAdmin is Script, BaseLogger, DeployInput {
+contract AcceptAdmin is Script, BaseLogger, URMCompoundDeployInput {
   function run() public {
     vm.startBroadcast();
 

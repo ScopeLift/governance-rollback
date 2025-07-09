@@ -3,29 +3,29 @@ pragma solidity ^0.8.20;
 
 // External imports
 import {Test} from "forge-std/Test.sol";
-import {console2} from "forge-std/console2.sol";
 // Internal imports
-import {DeployScriptsIntegrationTest} from "test/DeployScripts.integration.t.sol";
+import {URMCompoundDeploymentIntegrationTest} from "test/URMCompoundDeployment.integration.t.sol";
 import {FakeProtocolContract} from "test/fakes/FakeProtocolContract.sol";
 import {CompoundGovernorHelper} from "test/helpers/CompoundGovernorHelper.sol";
 import {FakeProtocolRollbackTestHelper} from "test/fakes/FakeProtocolRollbackTestHelper.sol";
-import {UpgradeRegressionManager} from "src/contracts/UpgradeRegressionManager.sol";
+import {URMCompoundManager} from "src/contracts/urm/URMCompoundManager.sol";
 import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
-import {DeployInput} from "script/DeployInput.sol";
+import {URMCompoundDeployInput} from "script/URMCompoundDeployInput.sol";
 import {ProposeTransferOwnershipToShim} from "script/2_ProposeTransferOwnershipToShim.s.sol";
+import {Proposal} from "test/helpers/Proposal.sol";
 
 /// @notice Integration tests to verify the impact of the governance upgrade on existing proposals at different
 /// lifecycle stages
-/// @dev - docs/GOVERNANCE_UPGRADE_IMPACT.md
-contract GovernanceUpgradeImpactIntegrationTest is Test, DeployInput {
+/// @dev - docs/COMPOUND_GOVERNANCE_UPGRADE_IMPACT.md
+contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, URMCompoundDeployInput {
   FakeProtocolContract public fakeProtocolContract;
   CompoundGovernorHelper public govHelper;
   FakeProtocolRollbackTestHelper public rollbackHelper;
-  DeployScriptsIntegrationTest public deployScripts;
+  URMCompoundDeploymentIntegrationTest public deployScripts;
   address public timelockMultiAdminShim;
-  UpgradeRegressionManager public upgradeRegressionManager;
-  CompoundGovernorHelper.Proposal public proposalBeforeUpgrade;
-  CompoundGovernorHelper.Proposal public proposalAfterUpgrade;
+  URMCompoundManager public urm;
+  Proposal public proposalBeforeUpgrade;
+  Proposal public proposalAfterUpgrade;
 
   // Test addresses
   address public proposer;
@@ -41,32 +41,29 @@ contract GovernanceUpgradeImpactIntegrationTest is Test, DeployInput {
     uint256 forkBlock = 22_781_735;
     // Create fork of mainnet
     vm.createSelectFork(rpcUrl, forkBlock);
-    deployScripts = new DeployScriptsIntegrationTest();
+    deployScripts = new URMCompoundDeploymentIntegrationTest();
 
-    (timelockMultiAdminShim, upgradeRegressionManager, govHelper, proposer) = deployScripts.onlyDeployShimAndURM();
+    (timelockMultiAdminShim, urm, govHelper, proposer) = deployScripts.onlyDeployShimAndURM();
     // Deploy FakeProtocolContract with Compound Timelock as owner
     fakeProtocolContract = new FakeProtocolContract(COMPOUND_TIMELOCK);
     // Setup rollback helper and generate proposal before upgrade
-    rollbackHelper = new FakeProtocolRollbackTestHelper(fakeProtocolContract, upgradeRegressionManager);
+    rollbackHelper = new FakeProtocolRollbackTestHelper(fakeProtocolContract, urm);
 
     proposalBeforeUpgrade =
       rollbackHelper.generateProposalWithoutRollback(feeWhenProposalIsExecuted, feeGuardianWhenProposalIsExecuted);
   }
 
   function _proposeUpgradeAndExecuteProposalWithRoll() internal {
-    (timelockMultiAdminShim, upgradeRegressionManager, govHelper, proposer) =
+    (timelockMultiAdminShim, urm, govHelper, proposer) =
       deployScripts.onlyProposeTransferTimelockAdminToShim(timelockMultiAdminShim);
   }
 
-  function _proposeAndQueueRollbackUpgrade(address _shimAddress)
-    private
-    returns (CompoundGovernorHelper.Proposal memory _upgradeProposal)
-  {
+  function _proposeAndQueueRollbackUpgrade(address _shimAddress) private returns (Proposal memory _upgradeProposal) {
     ProposeTransferOwnershipToShim _script = new ProposeTransferOwnershipToShim();
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas, string memory _description) =
       _script.generateProposal(_shimAddress);
 
-    _upgradeProposal = CompoundGovernorHelper.Proposal(_targets, _values, _calldatas, _description);
+    _upgradeProposal = Proposal(_targets, _values, _calldatas, _description);
 
     // Propose, vote, and queue using the helper (but do NOT execute)
     govHelper.submitPassAndQueue(proposer, _upgradeProposal);
@@ -80,7 +77,7 @@ contract GovernanceUpgradeImpactIntegrationTest is Test, DeployInput {
 
   function onlyProposeAndQueueTransferTimelockAdminToShim(address _timelockMultiAdminShim)
     internal
-    returns (address, UpgradeRegressionManager, CompoundGovernorHelper, address)
+    returns (address, URMCompoundManager, CompoundGovernorHelper, address)
   {
     ProposeTransferOwnershipToShim _script = new ProposeTransferOwnershipToShim();
     _script.setLoggingSilenced(true); // Silence logging
@@ -88,11 +85,10 @@ contract GovernanceUpgradeImpactIntegrationTest is Test, DeployInput {
     (address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description) =
       _script.generateProposal(_timelockMultiAdminShim);
 
-    CompoundGovernorHelper.Proposal memory proposal =
-      CompoundGovernorHelper.Proposal(targets, values, calldatas, description);
+    Proposal memory proposal = Proposal(targets, values, calldatas, description);
 
     govHelper.submitPassAndQueue(proposer, proposal);
-    return (address(timelockMultiAdminShim), upgradeRegressionManager, govHelper, proposer);
+    return (address(timelockMultiAdminShim), urm, govHelper, proposer);
   }
 
   /// @notice Test that a proposal queued before the upgrade executes via the Shim
@@ -162,7 +158,7 @@ contract GovernanceUpgradeImpactIntegrationTest is Test, DeployInput {
     assertNotEq(fakeProtocolContract.fee(), feeWhenProposalIsExecuted);
     assertNotEq(fakeProtocolContract.feeGuardian(), feeGuardianWhenProposalIsExecuted);
 
-    CompoundGovernorHelper.Proposal memory _upgradeProposal = _proposeAndQueueRollbackUpgrade(timelockMultiAdminShim);
+    Proposal memory _upgradeProposal = _proposeAndQueueRollbackUpgrade(timelockMultiAdminShim);
 
     // 2. Propose and start voting on the normal proposal
     uint256 normalProposalId = govHelper.submitProposalWithRoll(proposer, proposalBeforeUpgrade);
