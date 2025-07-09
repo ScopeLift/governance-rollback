@@ -2,15 +2,14 @@
 pragma solidity ^0.8.30;
 
 // Internal Libraries
-import {ITimelockTarget} from "interfaces/ITimelockTarget.sol";
 import {Rollback, ProposalState} from "types/GovernanceTypes.sol";
 
-interface IUpgradeRegressionManager {
+interface IURM {
   /*///////////////////////////////////////////////////////////////
                      Public Storage 
   //////////////////////////////////////////////////////////////*/
 
-  function TARGET() external view returns (ITimelockTarget);
+  function TARGET() external view returns (address);
 
   function admin() external view returns (address);
 
