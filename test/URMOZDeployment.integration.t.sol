@@ -58,11 +58,11 @@ contract URMOZDeploymentIntegrationTest is Test, URMOZDeployInput {
     URM_OZ_MANAGER = address(urm);
   }
 
-  function runDeployScriptsForIntegrationTest() external returns (URMOZManager) {
+  function runDeployScriptsForIntegrationTest() external returns (URMOZManager, OZGovernorHelper, address) {
     setUp();
     _step1_deployURMOZ();
     _step2_grantRolesToURMOZ();
-    return (urm);
+    return (urm, governorHelper, proposer);
   }
 
   function onlyDeployURMOZ() external returns (URMOZManager) {
@@ -105,7 +105,7 @@ contract URMOZDeploymentIntegrationTest is Test, URMOZDeployInput {
     _step1_deployURMOZ();
 
     assertEq(address(urm.TARGET_TIMELOCK()), OZ_TIMELOCK);
-    assertEq(urm.admin(), OZ_GOVERNOR);
+    assertEq(urm.admin(), OZ_TIMELOCK);
     assertEq(urm.guardian(), GUARDIAN);
     assertEq(urm.rollbackQueueableDuration(), ROLLBACK_QUEUEABLE_DURATION);
     assertEq(urm.MIN_ROLLBACK_QUEUEABLE_DURATION(), MIN_ROLLBACK_QUEUEABLE_DURATION);

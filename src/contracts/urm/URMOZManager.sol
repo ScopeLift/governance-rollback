@@ -29,6 +29,16 @@ contract URMOZManager is URMCore {
                           Constructor
   //////////////////////////////////////////////////////////////*/
 
+  /// @notice Constructor for URMOZManager
+  /// @param _target The TimelockController that will execute rollback transactions
+  /// @param _admin The address that can propose rollbacks (should be the TimelockController in OZ Governor setups)
+  /// @param _guardian The address that can queue, cancel, and execute rollbacks
+  /// @param _rollbackQueueableDuration Duration after a rollback proposal during which it can be queued for execution
+  /// @param _minRollbackQueueableDuration Lower bound enforced on the rollback queueable duration
+  /// @dev In OpenZeppelin Governor + TimelockController setups, both _target and _admin should be set to the
+  /// TimelockController.
+  ///      This is because the TimelockController is the contract that executes scheduled transactions, and it needs
+  ///      admin privileges to propose rollbacks to this URMOZManager.
   constructor(
     address _target,
     address _admin,

@@ -20,7 +20,7 @@ contract DeployURMOZ is Script, BaseLogger, URMOZDeployInput {
 
     URMOZManager urm = new URMOZManager(
       OZ_TIMELOCK, // Target is the OZ TimelockController
-      OZ_GOVERNOR, // Admin is the OZ Governor
+      OZ_TIMELOCK, // Admin is the OZ TimelockController
       GUARDIAN, // Address that can queue, cancel and execute rollback
       ROLLBACK_QUEUEABLE_DURATION, // Duration after a rollback proposal during which it can be queued for execution
       MIN_ROLLBACK_QUEUEABLE_DURATION // Lower bound enforced on the rollback queueable duration
