@@ -2,27 +2,27 @@
 pragma solidity ^0.8.30;
 
 // Contract Imports
-import {URMCompoundManager} from "src/contracts/urm/URMCompoundManager.sol";
+import {URMOZManager} from "src/contracts/urm/URMOZManager.sol";
 import {URMCore} from "src/contracts/URMCore.sol";
 import {Rollback, ProposalState} from "src/types/GovernanceTypes.sol";
 
 // Test Imports
 import {Test} from "forge-std/Test.sol";
-import {MockCompoundTargetTimelock} from "test/mocks/MockCompoundTargetTimelock.sol";
+import {MockOZTargetTimelock} from "test/mocks/MockOZTargetTimelock.sol";
 
-contract URMCompoundManagerTest is Test {
-  URMCompoundManager public urm;
+contract URMOZManagerTest is Test {
+  URMOZManager public urm;
 
-  MockCompoundTargetTimelock public targetTimelock;
+  MockOZTargetTimelock public targetTimelock;
 
   address public guardian = makeAddr("guardian");
   address public admin = makeAddr("admin");
   uint256 public rollbackQueueableDuration = 1 days;
   uint256 public minRollbackQueueableDuration = 5 minutes;
 
-  function setUp() external {
-    targetTimelock = new MockCompoundTargetTimelock();
-    urm = new URMCompoundManager(
+  function setUp() public {
+    targetTimelock = new MockOZTargetTimelock();
+    urm = new URMOZManager(
       address(targetTimelock), admin, guardian, rollbackQueueableDuration, minRollbackQueueableDuration
     );
   }
@@ -109,7 +109,7 @@ contract URMCompoundManagerTest is Test {
   }
 }
 
-contract Constructor is URMCompoundManagerTest {
+contract Constructor is URMOZManagerTest {
   function testFuzz_SetsInitialParameters(
     address _targetTimelock,
     address _admin,
@@ -121,9 +121,8 @@ contract Constructor is URMCompoundManagerTest {
       _targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
     );
 
-    URMCompoundManager _urm = new URMCompoundManager(
-      _targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
-    );
+    URMOZManager _urm =
+      new URMOZManager(_targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration);
 
     assertEq(address(_urm.TARGET_TIMELOCK()), _targetTimelock);
     assertEq(_urm.MIN_ROLLBACK_QUEUEABLE_DURATION(), _minRollbackQueueableDuration);
@@ -145,9 +144,7 @@ contract Constructor is URMCompoundManagerTest {
 
     vm.expectEmit();
     emit URMCore.RollbackQueueableDurationSet(0, _rollbackQueueableDuration);
-    new URMCompoundManager(
-      _targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
-    );
+    new URMOZManager(_targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration);
   }
 
   function testFuzz_EmitsGuardianSet(
@@ -163,9 +160,7 @@ contract Constructor is URMCompoundManagerTest {
 
     vm.expectEmit();
     emit URMCore.GuardianSet(address(0), _guardian);
-    new URMCompoundManager(
-      _targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
-    );
+    new URMOZManager(_targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration);
   }
 
   function testFuzz_RevertIf_TargetTimelockIsZeroAddress(
@@ -181,7 +176,7 @@ contract Constructor is URMCompoundManagerTest {
       _boundToRealisticRollbackQueueableDuration(_rollbackQueueableDuration, _minRollbackQueueableDuration);
 
     vm.expectRevert(URMCore.URM__InvalidAddress.selector);
-    new URMCompoundManager(address(0), _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration);
+    new URMOZManager(address(0), _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration);
   }
 
   function testFuzz_RevertIf_AdminIsZeroAddress(
@@ -197,9 +192,7 @@ contract Constructor is URMCompoundManagerTest {
       _boundToRealisticRollbackQueueableDuration(_rollbackQueueableDuration, _minRollbackQueueableDuration);
 
     vm.expectRevert(URMCore.URM__InvalidAddress.selector);
-    new URMCompoundManager(
-      _targetTimelock, address(0), _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
-    );
+    new URMOZManager(_targetTimelock, address(0), _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration);
   }
 
   function testFuzz_RevertIf_GuardianIsZeroAddress(
@@ -215,9 +208,7 @@ contract Constructor is URMCompoundManagerTest {
       _boundToRealisticRollbackQueueableDuration(_rollbackQueueableDuration, _minRollbackQueueableDuration);
 
     vm.expectRevert(URMCore.URM__InvalidAddress.selector);
-    new URMCompoundManager(
-      _targetTimelock, _admin, address(0), _rollbackQueueableDuration, _minRollbackQueueableDuration
-    );
+    new URMOZManager(_targetTimelock, _admin, address(0), _rollbackQueueableDuration, _minRollbackQueueableDuration);
   }
 
   function testFuzz_RevertIf_RollbackQueueableDurationIsLessThanMinRollbackQueueableDuration(
@@ -236,7 +227,7 @@ contract Constructor is URMCompoundManagerTest {
     uint256 _invalidRollbackQueueableDuration = bound(_rollbackQueueableDuration, 0, _minRollbackQueueableDuration - 1);
 
     vm.expectRevert(URMCore.URM__InvalidRollbackQueueableDuration.selector);
-    new URMCompoundManager(
+    new URMOZManager(
       _targetTimelock, _admin, _guardian, _invalidRollbackQueueableDuration, _minRollbackQueueableDuration
     );
   }
@@ -252,11 +243,11 @@ contract Constructor is URMCompoundManagerTest {
       _targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
     );
     vm.expectRevert(URMCore.URM__InvalidRollbackQueueableDuration.selector);
-    new URMCompoundManager(_targetTimelock, _admin, _guardian, _rollbackQueueableDuration, 0);
+    new URMOZManager(_targetTimelock, _admin, _guardian, _rollbackQueueableDuration, 0);
   }
 }
 
-contract GetRollback is URMCompoundManagerTest {
+contract GetRollback is URMOZManagerTest {
   function testFuzz_ReturnsTheRollbackData(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
@@ -280,7 +271,7 @@ contract GetRollback is URMCompoundManagerTest {
   }
 }
 
-contract Propose is URMCompoundManagerTest {
+contract Propose is URMOZManagerTest {
   function testFuzz_AllowTheAdminToProposeARollbackAndReturnsTheRollbackId(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
@@ -439,7 +430,7 @@ contract Propose is URMCompoundManagerTest {
   }
 }
 
-contract Queue is URMCompoundManagerTest {
+contract Queue is URMOZManagerTest {
   function testFuzz_ForwardsParametersToTargetTimelockWhenCallerIsGuardian(
     uint256 _delay,
     address[2] memory _targetsFixed,
@@ -458,18 +449,36 @@ contract Queue is URMCompoundManagerTest {
     vm.prank(guardian);
     urm.queue(_targets, _values, _calldatas, _description);
 
-    MockCompoundTargetTimelock.TimelockTransactionCall[] memory _lastQueueTransactionCalls =
-      targetTimelock.lastParam__queueTransactions__();
+    MockOZTargetTimelock.BatchCall memory _lastScheduleBatchCall = targetTimelock.lastParam__scheduleBatch__();
 
-    assertEq(_lastQueueTransactionCalls.length, _targets.length);
+    // Check that scheduleBatch was called
+    assertTrue(_lastScheduleBatchCall.called);
 
+    // Check that the targets array matches
+    assertEq(_lastScheduleBatchCall.targets.length, _targets.length);
     for (uint256 i = 0; i < _targets.length; i++) {
-      assertEq(_lastQueueTransactionCalls[i].target, _targets[i]);
-      assertEq(_lastQueueTransactionCalls[i].value, _values[i]);
-      assertEq(_lastQueueTransactionCalls[i].signature, "");
-      assertEq(_lastQueueTransactionCalls[i].data, _calldatas[i]);
-      assertEq(_lastQueueTransactionCalls[i].eta, block.timestamp + targetTimelock.delay());
+      assertEq(_lastScheduleBatchCall.targets[i], _targets[i]);
     }
+
+    // Check that the values array matches
+    assertEq(_lastScheduleBatchCall.values.length, _values.length);
+    for (uint256 i = 0; i < _values.length; i++) {
+      assertEq(_lastScheduleBatchCall.values[i], _values[i]);
+    }
+
+    // Check that the calldatas array matches
+    assertEq(_lastScheduleBatchCall.calldatas.length, _calldatas.length);
+    for (uint256 i = 0; i < _calldatas.length; i++) {
+      assertEq(_lastScheduleBatchCall.calldatas[i], _calldatas[i]);
+    }
+
+    // Check OZ-specific parameters
+    assertEq(_lastScheduleBatchCall.predecessor, bytes32(0));
+    assertEq(_lastScheduleBatchCall.delay, targetTimelock.getMinDelay());
+
+    // Check that the salt is correctly computed (should match URMOZManager's _timelockSalt)
+    bytes32 expectedSalt = bytes20(address(urm)) ^ keccak256(bytes(_description));
+    assertEq(_lastScheduleBatchCall.salt, expectedSalt);
   }
 
   function testFuzz_RollbackStateIsCorrectlySet(
@@ -491,7 +500,7 @@ contract Queue is URMCompoundManagerTest {
     Rollback memory _rollback = urm.getRollback(_rollbackId);
 
     assertEq(_rollback.queueExpiresAt, _queueExpiresAtBeforeQueuing);
-    assertEq(_rollback.executableAt, block.timestamp + targetTimelock.delay());
+    assertEq(_rollback.executableAt, block.timestamp + targetTimelock.getMinDelay());
     assertEq(_rollback.canceled, false);
     assertEq(_rollback.executed, false);
   }
@@ -523,7 +532,7 @@ contract Queue is URMCompoundManagerTest {
     uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
 
     vm.expectEmit();
-    emit URMCore.RollbackQueued(_rollbackId, block.timestamp + targetTimelock.delay());
+    emit URMCore.RollbackQueued(_rollbackId, block.timestamp + targetTimelock.getMinDelay());
 
     vm.prank(guardian);
     urm.queue(_targets, _values, _calldatas, _description);
@@ -644,7 +653,7 @@ contract Queue is URMCompoundManagerTest {
   }
 }
 
-contract Cancel is URMCompoundManagerTest {
+contract Cancel is URMOZManagerTest {
   function testFuzz_ForwardsParametersToTargetTimelockWhenCallerIsGuardian(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
@@ -657,18 +666,13 @@ contract Cancel is URMCompoundManagerTest {
     vm.prank(guardian);
     urm.cancel(_targets, _values, _calldatas, _description);
 
-    MockCompoundTargetTimelock.TimelockTransactionCall[] memory _lastCancelTransactionCalls =
-      targetTimelock.lastParam__cancelTransactions__();
+    bytes32 _salt = bytes20(address(urm)) ^ keccak256(bytes(_description));
 
-    assertEq(_lastCancelTransactionCalls.length, _targets.length);
+    bytes32 _rollbackId = targetTimelock.hashOperationBatch(_targets, _values, _calldatas, 0, _salt);
+    MockOZTargetTimelock.CancelCall memory _lastCancelCall = targetTimelock.lastParam__cancel__();
 
-    for (uint256 i = 0; i < _targets.length; i++) {
-      assertEq(_lastCancelTransactionCalls[i].target, _targets[i]);
-      assertEq(_lastCancelTransactionCalls[i].value, _values[i]);
-      assertEq(_lastCancelTransactionCalls[i].signature, "");
-      assertEq(_lastCancelTransactionCalls[i].data, _calldatas[i]);
-      assertEq(_lastCancelTransactionCalls[i].eta, block.timestamp + targetTimelock.delay());
-    }
+    assertTrue(_lastCancelCall.called);
+    assertEq(_lastCancelCall.rollbackId, _rollbackId);
   }
 
   function testFuzz_EmitsRollbackCanceled(
@@ -704,7 +708,7 @@ contract Cancel is URMCompoundManagerTest {
     Rollback memory _rollback = urm.getRollback(_rollbackId);
 
     assertEq(_rollback.queueExpiresAt, block.timestamp + rollbackQueueableDuration);
-    assertEq(_rollback.executableAt, block.timestamp + targetTimelock.delay());
+    assertEq(_rollback.executableAt, block.timestamp + targetTimelock.getMinDelay());
     assertEq(_rollback.canceled, true);
     assertEq(_rollback.executed, false);
   }
@@ -776,7 +780,7 @@ contract Cancel is URMCompoundManagerTest {
     assertEq(uint8(_initialState), uint8(ProposalState.Queued));
 
     // Warp to after the execution time and execute the rollback
-    vm.warp(block.timestamp + targetTimelock.delay());
+    vm.warp(block.timestamp + targetTimelock.getMinDelay());
     vm.prank(guardian);
     urm.execute(_targets, _values, _calldatas, _description);
 
@@ -835,7 +839,7 @@ contract Cancel is URMCompoundManagerTest {
   }
 }
 
-contract Execute is URMCompoundManagerTest {
+contract Execute is URMOZManagerTest {
   function testFuzz_ForwardsParametersToTargetTimelockWhenCallerIsGuardian(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
@@ -846,23 +850,28 @@ contract Execute is URMCompoundManagerTest {
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
     _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
-    uint256 _eta = block.timestamp + targetTimelock.delay();
+    uint256 _eta = block.timestamp + targetTimelock.getMinDelay();
 
     vm.warp(_eta);
     vm.prank(guardian);
     urm.execute(_targets, _values, _calldatas, _description);
 
-    MockCompoundTargetTimelock.TimelockTransactionCall[] memory _lastExecuteTransactionCalls =
-      targetTimelock.lastParam__executeTransactions__();
+    MockOZTargetTimelock.ExecuteBatchCall memory _lastExecuteBatchCall = targetTimelock.lastParam__executeBatch__();
 
-    assertEq(_lastExecuteTransactionCalls.length, _targets.length);
+    bytes32 _salt = bytes20(address(urm)) ^ keccak256(bytes(_description));
+
+    assertTrue(_lastExecuteBatchCall.called);
+    assertEq(_lastExecuteBatchCall.targets.length, _targets.length);
+    assertEq(_lastExecuteBatchCall.values.length, _values.length);
+    assertEq(_lastExecuteBatchCall.calldatas.length, _calldatas.length);
+    assertEq(_lastExecuteBatchCall.predecessor, bytes32(0));
+    assertEq(_lastExecuteBatchCall.salt, _salt);
+    assertEq(_lastExecuteBatchCall.valueSent, 0);
 
     for (uint256 i = 0; i < _targets.length; i++) {
-      assertEq(_lastExecuteTransactionCalls[i].target, _targets[i]);
-      assertEq(_lastExecuteTransactionCalls[i].value, _values[i]);
-      assertEq(_lastExecuteTransactionCalls[i].signature, "");
-      assertEq(_lastExecuteTransactionCalls[i].data, _calldatas[i]);
-      assertEq(_lastExecuteTransactionCalls[i].eta, _eta);
+      assertEq(_lastExecuteBatchCall.targets[i], _targets[i]);
+      assertEq(_lastExecuteBatchCall.values[i], _values[i]);
+      assertEq(_lastExecuteBatchCall.calldatas[i], _calldatas[i]);
     }
   }
 
@@ -879,7 +888,7 @@ contract Execute is URMCompoundManagerTest {
     vm.expectEmit();
     emit URMCore.RollbackExecuted(_rollbackId);
 
-    vm.warp(block.timestamp + targetTimelock.delay());
+    vm.warp(block.timestamp + targetTimelock.getMinDelay());
     vm.prank(guardian);
     urm.execute(_targets, _values, _calldatas, _description);
   }
@@ -919,7 +928,7 @@ contract Execute is URMCompoundManagerTest {
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
     uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
-    vm.warp(block.timestamp + targetTimelock.delay());
+    vm.warp(block.timestamp + targetTimelock.getMinDelay());
     vm.prank(guardian);
     urm.execute(_targets, _values, _calldatas, _description);
 
@@ -937,7 +946,7 @@ contract Execute is URMCompoundManagerTest {
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
     uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
-    vm.warp(block.timestamp + targetTimelock.delay() - 1);
+    vm.warp(block.timestamp + targetTimelock.getMinDelay() - 1);
     vm.expectRevert(abi.encodeWithSelector(URMCore.URM__ExecutionTooEarly.selector, _rollbackId));
     vm.prank(guardian);
     urm.execute(_targets, _values, _calldatas, _description);
@@ -953,7 +962,7 @@ contract Execute is URMCompoundManagerTest {
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
     uint256 _computedRollbackId = urm.getRollbackId(_targets, _values, _calldatas, _description);
 
-    vm.warp(block.timestamp + targetTimelock.delay());
+    vm.warp(block.timestamp + targetTimelock.getMinDelay());
 
     vm.expectRevert(abi.encodeWithSelector(URMCore.URM__NotQueued.selector, _computedRollbackId));
     vm.prank(guardian);
@@ -984,7 +993,7 @@ contract Execute is URMCompoundManagerTest {
     assertEq(uint8(_canceledState), uint8(ProposalState.Canceled));
 
     // Warp to after the execution time would have been
-    vm.warp(block.timestamp + targetTimelock.delay());
+    vm.warp(block.timestamp + targetTimelock.getMinDelay());
 
     // Try to execute the canceled rollback - should revert with specific error
     vm.expectRevert(abi.encodeWithSelector(URMCore.URM__NotQueued.selector, _rollbackId));
@@ -1006,7 +1015,7 @@ contract Execute is URMCompoundManagerTest {
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
     uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
-    vm.warp(block.timestamp + targetTimelock.delay());
+    vm.warp(block.timestamp + targetTimelock.getMinDelay());
     vm.prank(guardian);
     urm.execute(_targets, _values, _calldatas, _description);
 
@@ -1045,7 +1054,7 @@ contract Execute is URMCompoundManagerTest {
 
     _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
-    vm.warp(block.timestamp + targetTimelock.delay());
+    vm.warp(block.timestamp + targetTimelock.getMinDelay());
 
     vm.startPrank(guardian);
     // target and values length mismatch
@@ -1060,7 +1069,7 @@ contract Execute is URMCompoundManagerTest {
   }
 }
 
-contract State is URMCompoundManagerTest {
+contract State is URMOZManagerTest {
   function testFuzz_PendingWithinQueueWindow(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
@@ -1151,7 +1160,7 @@ contract State is URMCompoundManagerTest {
     uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
     // Bound time offset to be before the executable time
-    _timeOffset = bound(_timeOffset, 0, targetTimelock.delay() - 1);
+    _timeOffset = bound(_timeOffset, 0, targetTimelock.getMinDelay() - 1);
 
     // Warp to a time before the executable duration
     vm.warp(block.timestamp + _timeOffset);
@@ -1173,7 +1182,7 @@ contract State is URMCompoundManagerTest {
     uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
     // Bound time offset to be after the executable time
-    _timeOffset = bound(_timeOffset, targetTimelock.delay(), targetTimelock.delay() + 30 days);
+    _timeOffset = bound(_timeOffset, targetTimelock.getMinDelay(), targetTimelock.getMinDelay() + 30 days);
 
     // Warp to a time after the executable duration
     vm.warp(block.timestamp + _timeOffset);
@@ -1198,14 +1207,14 @@ contract State is URMCompoundManagerTest {
     assertEq(uint8(_initialState), uint8(ProposalState.Queued));
 
     // Warp to exactly when the execution time arrives
-    vm.warp(block.timestamp + targetTimelock.delay());
+    vm.warp(block.timestamp + targetTimelock.getMinDelay());
 
     // Verify the rollback is now in active state at the exact boundary
     ProposalState _exactExecutionState = urm.state(_rollbackId);
     assertEq(uint8(_exactExecutionState), uint8(ProposalState.Active));
 
     // Warp 1 second before execution time to verify it's still queued
-    vm.warp(block.timestamp - targetTimelock.delay() + targetTimelock.delay() - 1);
+    vm.warp(block.timestamp - targetTimelock.getMinDelay() + targetTimelock.getMinDelay() - 1);
     ProposalState _beforeExecutionState = urm.state(_rollbackId);
     assertEq(uint8(_beforeExecutionState), uint8(ProposalState.Queued));
 
@@ -1227,7 +1236,7 @@ contract State is URMCompoundManagerTest {
     uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
 
     // Warp to executable time
-    vm.warp(block.timestamp + targetTimelock.delay());
+    vm.warp(block.timestamp + targetTimelock.getMinDelay());
 
     // Execute the rollback
     vm.prank(guardian);
@@ -1273,7 +1282,7 @@ contract State is URMCompoundManagerTest {
   }
 }
 
-contract SetGuardian is URMCompoundManagerTest {
+contract SetGuardian is URMOZManagerTest {
   function test_SetsGuardian(address _newGuardian) external {
     _assumeSafeGuardian(_newGuardian);
 
@@ -1308,7 +1317,7 @@ contract SetGuardian is URMCompoundManagerTest {
   }
 }
 
-contract SetRollbackQueueableDuration is URMCompoundManagerTest {
+contract SetRollbackQueueableDuration is URMOZManagerTest {
   function test_SetsRollbackQueueableDuration(uint256 _newRollbackQueueableDuration) external {
     _newRollbackQueueableDuration =
       _boundToRealisticRollbackQueueableDuration(_newRollbackQueueableDuration, minRollbackQueueableDuration);
@@ -1349,7 +1358,7 @@ contract SetRollbackQueueableDuration is URMCompoundManagerTest {
   }
 }
 
-contract SetAdmin is URMCompoundManagerTest {
+contract SetAdmin is URMOZManagerTest {
   function test_SetsAdmin(address _newAdmin) external {
     _assumeSafeAdmin(_newAdmin);
 
@@ -1384,7 +1393,7 @@ contract SetAdmin is URMCompoundManagerTest {
   }
 }
 
-contract GetRollbackId is URMCompoundManagerTest {
+contract GetRollbackId is URMOZManagerTest {
   function test_ReturnsRollbackId(
     address[] memory _targets,
     uint256[] memory _values,
@@ -1393,6 +1402,10 @@ contract GetRollbackId is URMCompoundManagerTest {
   ) external view {
     uint256 _rollbackId = urm.getRollbackId(_targets, _values, _calldatas, _description);
 
-    assertEq(_rollbackId, uint256(keccak256(abi.encode(_targets, _values, _calldatas, _description))));
+    // The URMOZManager uses the timelock's hashOperationBatch method
+    bytes32 _salt = bytes20(address(urm)) ^ keccak256(bytes(_description));
+    bytes32 expectedRollbackId = targetTimelock.hashOperationBatch(_targets, _values, _calldatas, 0, _salt);
+
+    assertEq(_rollbackId, uint256(expectedRollbackId));
   }
 }
