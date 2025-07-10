@@ -3,7 +3,7 @@ pragma solidity ^0.8.30;
 
 import {ICompoundTimelockTarget} from "src/interfaces/ICompoundTimelockTarget.sol";
 
-contract MockCompoundTimelockTarget is ICompoundTimelockTarget {
+contract MockCompoundTargetTimelock is ICompoundTimelockTarget {
   // Struct for tracking function call parameters
   struct TimelockTransactionCall {
     address target;
