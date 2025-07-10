@@ -5,7 +5,7 @@ pragma solidity ^0.8.30;
 import {URMCore} from "contracts/URMCore.sol";
 import {ICompoundTimelockTarget} from "interfaces/ICompoundTimelockTarget.sol";
 
-/// @title URMCompoundTimelock
+/// @title URMCompoundManager
 /// @author [ScopeLift](https://scopelift.co)
 /// @notice Integrates URMCore with a Compound-style Timelock contract as the execution target.
 /// @dev This contract implements the rollback proposal lifecycle using Compound's Timelock interface.
@@ -14,17 +14,17 @@ import {ICompoundTimelockTarget} from "interfaces/ICompoundTimelockTarget.sol";
 ///      Usecase:
 ///        - Use this contract when your system uses Compound-style Timelocks, often found in simpler or more minimal
 /// governance systems (e.g., Compound, Fuse, etc.).
-///      Key Differences from URMTimelockController:
+///      Key Differences from URMOZManager:
 ///       - Queues, cancels, and executes each transaction individually (per `queueTransaction`).
 ///       - Computes rollback IDs using `keccak256(abi.encode(...))` of the batch parameters.
 ///       - Uses the `delay()` function on the target contract to determine delay.
 ///       - No batch operation support or salt-based identifiers — relies purely on encoded parameters and ETA.
 ///      Requirements:
-///        - The `TARGET_TIMELOCK` must conform to the `ICompoundTimelockTarget` interface, compatible with Compound’s
+///        - The `TARGET_TIMELOCK` must conform to the `ICompoundTimelockTarget` interface, compatible with Compound's
 /// Timelock.
 /// @dev Source:
 /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/ba35d580f47ba90494eb9f3d26f58f7949b10c67/contracts/vendor/compound/ICompoundTimelock.sol
-contract URMCompoundTimelock is URMCore {
+contract URMCompoundManager is URMCore {
   /*///////////////////////////////////////////////////////////////
                           Constructor
   //////////////////////////////////////////////////////////////*/

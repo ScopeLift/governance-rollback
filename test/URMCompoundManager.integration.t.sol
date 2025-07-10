@@ -6,24 +6,24 @@ import {Test} from "forge-std/Test.sol";
 import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompoundTimelock.sol";
 
 // Internal imports
-import {DeployScriptsIntegrationTest} from "test/DeployScriptsCompound.integration.t.sol";
+import {URMCompoundDeploymentIntegrationTest} from "test/URMCompoundDeployment.integration.t.sol";
 import {FakeProtocolContract} from "test/fakes/FakeProtocolContract.sol";
 import {CompoundGovernorHelper} from "test/helpers/CompoundGovernorHelper.sol";
 import {FakeProtocolRollbackTestHelper} from "test/fakes/FakeProtocolRollbackTestHelper.sol";
-import {URMCompoundTimelock} from "src/contracts/urm/URMCompoundTimelock.sol";
+import {URMCompoundManager} from "src/contracts/urm/URMCompoundManager.sol";
 import {DeployInput} from "script/DeployInput.sol";
 import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
 import {ProposalState} from "src/types/GovernanceTypes.sol";
 import {URMCore} from "src/contracts/URMCore.sol";
 import {Proposal} from "test/helpers/Proposal.sol";
 
-contract URMCompoundTimelockIntegrationTest is Test, DeployInput {
+contract URMCompoundManagerIntegrationTest is Test, DeployInput {
   FakeProtocolContract public fakeProtocolContract;
   CompoundGovernorHelper public govHelper;
   FakeProtocolRollbackTestHelper public rollbackHelper;
-  DeployScriptsIntegrationTest public deployScripts;
+  URMCompoundDeploymentIntegrationTest public deployScripts;
   address public timelockMultiAdminShim;
-  URMCompoundTimelock public urm;
+  URMCompoundManager public urm;
 
   // Test addresses
   address public proposer;
@@ -40,7 +40,7 @@ contract URMCompoundTimelockIntegrationTest is Test, DeployInput {
     // Create fork of mainnet
     vm.createSelectFork(rpcUrl, forkBlock);
 
-    deployScripts = new DeployScriptsIntegrationTest();
+    deployScripts = new URMCompoundDeploymentIntegrationTest();
     (timelockMultiAdminShim, urm, govHelper, proposer) = deployScripts.runDeployScriptsForIntegrationTest();
 
     // Deploy FakeProtocolContract with Compound Timelock as owner
@@ -51,7 +51,7 @@ contract URMCompoundTimelockIntegrationTest is Test, DeployInput {
   }
 }
 
-contract ProposeWithRollback is URMCompoundTimelockIntegrationTest {
+contract ProposeWithRollback is URMCompoundManagerIntegrationTest {
   function testFork_ProposalExecutionAddsRollbackTransactionsToUrmWhichExpireAfterExecutionWindow() public {
     // 1. Create proposal to change fee and feeGuardian
     Proposal memory proposal = rollbackHelper.generateProposalWithRollback(

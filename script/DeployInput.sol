@@ -23,6 +23,6 @@ contract DeployInput {
   // Deployed TimelockMultiAdminShim contract
   address public TIMELOCK_MULTI_ADMIN_SHIM = address(0);
 
-  // Deployed URMCompoundTimelock contract
-  address public URM_COMPOUND_TIMELOCK = address(0);
+  // Deployed URMCompoundManager contract
+  address public URM_COMPOUND_MANAGER = address(0);
 }
