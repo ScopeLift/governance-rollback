@@ -46,7 +46,7 @@ contract FakeProtocolRollbackTestHelper {
     _description = "Emergency rollback for FakeProtocolContract";
   }
 
-  /// @notice Generates the rollback ID for a given set of parameters
+  /// @notice Generates the rollback id for a given set of parameters
   /// @param _rollbackFee The rollback fee to set
   /// @param _rollbackFeeGuardian The rollback fee guardian to set
   /// @return The rollback ID

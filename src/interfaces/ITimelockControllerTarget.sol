@@ -3,7 +3,7 @@ pragma solidity ^0.8.30;
 
 /// @title ITimelockControllerTarget
 /// @author [ScopeLift](https://scopelift.co)
-/// @notice Minimal interface for interacting with a timelock-compatible target used by URM.
+/// @notice Minimal interface for interacting with an OZ timelock-compatible target used by URM.
 /// @dev This interface represents a simplified subset of the
 ///      [TimelockController](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/ba35d580f47ba90494eb9f3d26f58f7949b10c67/contracts/governance/TimelockController.sol)
 ///      contract, tailored for use by URM.

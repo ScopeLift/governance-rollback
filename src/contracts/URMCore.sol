@@ -13,7 +13,7 @@ import {Rollback, ProposalState} from "types/GovernanceTypes.sol";
 ///      - Admin proposes rollback transactions.
 ///      - Guardian queues them for execution within a specified window
 ///      - Guardian later executes or cancels the queued rollback.
-///      - On queuing / cancelling / executing, the transactions are sent to TimelockTarget.
+///      - On queuing / cancelling / executing, the transactions are sent to TARGET_TIMELOCK.
 abstract contract URMCore is IURM {
   /*///////////////////////////////////////////////////////////////
                           Errors
@@ -99,7 +99,7 @@ abstract contract URMCore is IURM {
   //////////////////////////////////////////////////////////////*/
 
   /// @notice Target for timelocked execution of rollback transactions.
-  address public immutable TARGET;
+  address public immutable TARGET_TIMELOCK;
 
   /// @notice The lower bound enforced for the rollbackQueueableDuration setting.
   uint256 public immutable MIN_ROLLBACK_QUEUEABLE_DURATION;
@@ -122,7 +122,7 @@ abstract contract URMCore is IURM {
   //////////////////////////////////////////////////////////////*/
 
   /// @notice Initializes the URM.
-  /// @param _target The target for timelocked execution of rollback transactions.
+  /// @param _targetTimelock The target for timelocked execution of rollback transactions.
   /// @param _admin The address that manages this contract.
   /// @param _guardian The address that can execute rollback transactions.
   /// @param _rollbackQueueableDuration The duration within which a proposed rollback remains eligible to be queued for
@@ -130,7 +130,7 @@ abstract contract URMCore is IURM {
   /// @param _minRollbackQueueableDuration The lower bound enforced for the rollbackQueueableDuration setting (in
   /// seconds).
   constructor(
-    address _target,
+    address _targetTimelock,
     address _admin,
     address _guardian,
     uint256 _rollbackQueueableDuration,
@@ -140,11 +140,11 @@ abstract contract URMCore is IURM {
       revert URM__InvalidRollbackQueueableDuration();
     }
 
-    if (address(_target) == address(0)) {
+    if (address(_targetTimelock) == address(0)) {
       revert URM__InvalidAddress();
     }
 
-    TARGET = _target;
+    TARGET_TIMELOCK = _targetTimelock;
     MIN_ROLLBACK_QUEUEABLE_DURATION = _minRollbackQueueableDuration;
 
     _setAdmin(_admin);
@@ -344,7 +344,7 @@ abstract contract URMCore is IURM {
                           Public Functions
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Calculates the rollback ID for a given set of parameters.
+  /// @notice Calculates the rollback id for a given set of parameters.
   /// @param _targets The targets of the transactions.
   /// @param _values The values of the transactions.
   /// @param _calldatas The calldatas of the transactions.
@@ -480,8 +480,8 @@ abstract contract URMCore is IURM {
                       Target Interaction Hooks
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Returns the delay of the timelock target.
-  /// @return The delay of the timelock target.
+  /// @notice Returns the minimum delay required by the timelock target before a queued rollback can be executed.
+  /// @return The delay in seconds that must elapse between queueing and executing a rollback.
   function _delay() internal view virtual returns (uint256);
 
   /// @notice Queues a rollback to the timelock target.

@@ -9,7 +9,7 @@ import {ICompoundTimelockTarget} from "interfaces/ICompoundTimelockTarget.sol";
 /// @author [ScopeLift](https://scopelift.co)
 /// @notice Integrates URMCore with a Compound-style Timelock contract as the execution target.
 /// @dev This contract implements the rollback proposal lifecycle using Compound's Timelock interface.
-///      It interacts with the target using individual `queueTransaction`, `cancelTransaction`, and `executeTransaction`
+/// It interacts with the target using individual `queueTransaction`, `cancelTransaction`, and `executeTransaction`
 /// calls for each action.
 ///      Usecase:
 ///        - Use this contract when your system uses Compound-style Timelocks, often found in simpler or more minimal
@@ -20,7 +20,8 @@ import {ICompoundTimelockTarget} from "interfaces/ICompoundTimelockTarget.sol";
 ///       - Uses the `delay()` function on the target contract to determine delay.
 ///       - No batch operation support or salt-based identifiers — relies purely on encoded parameters and ETA.
 ///      Requirements:
-///        - The `TARGET` must conform to the `ICompoundTimelockTarget` interface, compatible with Compound’s Timelock.
+///        - The `TARGET_TIMELOCK` must conform to the `ICompoundTimelockTarget` interface, compatible with Compound’s
+/// Timelock.
 /// @dev Source:
 /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/ba35d580f47ba90494eb9f3d26f58f7949b10c67/contracts/vendor/compound/ICompoundTimelock.sol
 contract URMCompoundTimelock is URMCore {
@@ -29,18 +30,18 @@ contract URMCompoundTimelock is URMCore {
   //////////////////////////////////////////////////////////////*/
 
   constructor(
-    address _target,
+    address _targetTimelock,
     address _admin,
     address _guardian,
     uint256 _rollbackQueueableDuration,
     uint256 _minRollbackQueueableDuration
-  ) URMCore(_target, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration) {}
+  ) URMCore(_targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration) {}
 
   /*///////////////////////////////////////////////////////////////
                           Overrides
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Returns the rollback ID for a given set of parameters.
+  /// @notice Returns the rollback id for a given set of parameters.
   /// @param _targets The targets of the transactions.
   /// @param _values The values of the transactions.
   /// @param _calldatas The calldatas of the transactions.
@@ -59,12 +60,12 @@ contract URMCompoundTimelock is URMCore {
     return uint256(keccak256(abi.encode(_targets, _values, _calldatas, _description)));
   }
 
-  /// @notice Returns the delay of the timelock target.
+  /// @notice Returns the minimum delay required by the timelock target before a queued rollback can be executed.
   /// @return The delay of the timelock target.
   /// @dev Source:
   /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/ba35d580f47ba90494eb9f3d26f58f7949b10c67/contracts/vendor/compound/ICompoundTimelock.sol#L53
   function _delay() internal view override returns (uint256) {
-    return ICompoundTimelockTarget(TARGET).delay();
+    return ICompoundTimelockTarget(TARGET_TIMELOCK).delay();
   }
 
   /// @notice Queues a rollback to the timelock target.
@@ -83,7 +84,9 @@ contract URMCompoundTimelock is URMCore {
     uint256 _executableAt = _getRollbackExecutableAt(_targets, _values, _calldatas, _description);
 
     for (uint256 _i = 0; _i < _targets.length; _i++) {
-      ICompoundTimelockTarget(TARGET).queueTransaction(_targets[_i], _values[_i], "", _calldatas[_i], _executableAt);
+      ICompoundTimelockTarget(TARGET_TIMELOCK).queueTransaction(
+        _targets[_i], _values[_i], "", _calldatas[_i], _executableAt
+      );
     }
   }
 
@@ -103,7 +106,9 @@ contract URMCompoundTimelock is URMCore {
     uint256 _executableAt = _getRollbackExecutableAt(_targets, _values, _calldatas, _description);
 
     for (uint256 _i = 0; _i < _targets.length; _i++) {
-      ICompoundTimelockTarget(TARGET).cancelTransaction(_targets[_i], _values[_i], "", _calldatas[_i], _executableAt);
+      ICompoundTimelockTarget(TARGET_TIMELOCK).cancelTransaction(
+        _targets[_i], _values[_i], "", _calldatas[_i], _executableAt
+      );
     }
   }
 
@@ -123,7 +128,9 @@ contract URMCompoundTimelock is URMCore {
     uint256 _executableAt = _getRollbackExecutableAt(_targets, _values, _calldatas, _description);
 
     for (uint256 _i = 0; _i < _targets.length; _i++) {
-      ICompoundTimelockTarget(TARGET).executeTransaction(_targets[_i], _values[_i], "", _calldatas[_i], _executableAt);
+      ICompoundTimelockTarget(TARGET_TIMELOCK).executeTransaction(
+        _targets[_i], _values[_i], "", _calldatas[_i], _executableAt
+      );
     }
   }
 

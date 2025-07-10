@@ -129,7 +129,7 @@ contract DeployScriptsIntegrationTest is Test, DeployInput {
     assertEq(address(timelockMultiAdminShim.TIMELOCK()), COMPOUND_TIMELOCK);
     assertEq(timelockMultiAdminShim.admin(), COMPOUND_GOVERNOR);
     assertTrue(timelockMultiAdminShim.isExecutor(address(upgradeRegressionManager)));
-    assertEq(address(upgradeRegressionManager.TARGET()), address(timelockMultiAdminShim));
+    assertEq(address(upgradeRegressionManager.TARGET_TIMELOCK()), address(timelockMultiAdminShim));
     assertEq(upgradeRegressionManager.admin(), COMPOUND_TIMELOCK);
     assertEq(upgradeRegressionManager.guardian(), GUARDIAN);
     assertEq(upgradeRegressionManager.rollbackQueueableDuration(), ROLLBACK_QUEUEABLE_DURATION);
