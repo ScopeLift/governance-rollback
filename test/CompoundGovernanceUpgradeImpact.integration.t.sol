@@ -4,11 +4,11 @@ pragma solidity ^0.8.20;
 // External imports
 import {Test} from "forge-std/Test.sol";
 // Internal imports
-import {DeployScriptsIntegrationTest} from "test/DeployScriptsCompound.integration.t.sol";
+import {URMCompoundDeploymentIntegrationTest} from "test/URMCompoundDeployment.integration.t.sol";
 import {FakeProtocolContract} from "test/fakes/FakeProtocolContract.sol";
 import {CompoundGovernorHelper} from "test/helpers/CompoundGovernorHelper.sol";
 import {FakeProtocolRollbackTestHelper} from "test/fakes/FakeProtocolRollbackTestHelper.sol";
-import {URMCompoundTimelock} from "src/contracts/urm/URMCompoundTimelock.sol";
+import {URMCompoundManager} from "src/contracts/urm/URMCompoundManager.sol";
 import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
 import {DeployInput} from "script/DeployInput.sol";
 import {ProposeTransferOwnershipToShim} from "script/2_ProposeTransferOwnershipToShim.s.sol";
@@ -21,9 +21,9 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, DeployInput {
   FakeProtocolContract public fakeProtocolContract;
   CompoundGovernorHelper public govHelper;
   FakeProtocolRollbackTestHelper public rollbackHelper;
-  DeployScriptsIntegrationTest public deployScripts;
+  URMCompoundDeploymentIntegrationTest public deployScripts;
   address public timelockMultiAdminShim;
-  URMCompoundTimelock public urm;
+  URMCompoundManager public urm;
   Proposal public proposalBeforeUpgrade;
   Proposal public proposalAfterUpgrade;
 
@@ -41,7 +41,7 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, DeployInput {
     uint256 forkBlock = 22_781_735;
     // Create fork of mainnet
     vm.createSelectFork(rpcUrl, forkBlock);
-    deployScripts = new DeployScriptsIntegrationTest();
+    deployScripts = new URMCompoundDeploymentIntegrationTest();
 
     (timelockMultiAdminShim, urm, govHelper, proposer) = deployScripts.onlyDeployShimAndURM();
     // Deploy FakeProtocolContract with Compound Timelock as owner
@@ -77,7 +77,7 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, DeployInput {
 
   function onlyProposeAndQueueTransferTimelockAdminToShim(address _timelockMultiAdminShim)
     internal
-    returns (address, URMCompoundTimelock, CompoundGovernorHelper, address)
+    returns (address, URMCompoundManager, CompoundGovernorHelper, address)
   {
     ProposeTransferOwnershipToShim _script = new ProposeTransferOwnershipToShim();
     _script.setLoggingSilenced(true); // Silence logging

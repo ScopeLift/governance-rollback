@@ -10,7 +10,7 @@ import {IComp} from "@scopelift/compound-governance-upgrade/contracts/interfaces
 // Internal imports
 import {Test} from "forge-std/Test.sol";
 import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
-import {URMCompoundTimelock} from "src/contracts/urm/URMCompoundTimelock.sol";
+import {URMCompoundManager} from "src/contracts/urm/URMCompoundManager.sol";
 import {CompoundGovernorHelper, ICompoundGovernor} from "test/helpers/CompoundGovernorHelper.sol";
 
 // Deploy scripts
@@ -20,13 +20,13 @@ import {ProposeTransferOwnershipToShim} from "script/2_ProposeTransferOwnershipT
 import {AcceptAdmin} from "script/3_AcceptAdmin.s.sol";
 import {Proposal} from "test/helpers/Proposal.sol";
 
-/// @title Integration Tests for TimelockMultiAdminShim and URMCompoundTimelock
+/// @title Integration Tests for TimelockMultiAdminShim and URMCompoundManager
 /// @notice Tests the full deployment and governance lifecycle
 /// @dev This test suite requires MAINNET_RPC_URL environment variable to be set
-contract DeployScriptsIntegrationTest is Test, DeployInput {
+contract URMCompoundDeploymentIntegrationTest is Test, DeployInput {
   // Test state
   TimelockMultiAdminShim public timelockMultiAdminShim;
-  URMCompoundTimelock public urm;
+  URMCompoundManager public urm;
 
   // Helper contract for governance operations
   CompoundGovernorHelper public governorHelper;
@@ -56,12 +56,12 @@ contract DeployScriptsIntegrationTest is Test, DeployInput {
     // Update the DeployInput addresses for the proposal scripts
     // Since these are not constants in DeployInput, we can update them directly
     TIMELOCK_MULTI_ADMIN_SHIM = address(timelockMultiAdminShim);
-    URM_COMPOUND_TIMELOCK = address(urm);
+    URM_COMPOUND_MANAGER = address(urm);
   }
 
   function runDeployScriptsForIntegrationTest()
     external
-    returns (address, URMCompoundTimelock, CompoundGovernorHelper, address)
+    returns (address, URMCompoundManager, CompoundGovernorHelper, address)
   {
     setUp();
     _step1_deployShimAndURM();
@@ -70,7 +70,7 @@ contract DeployScriptsIntegrationTest is Test, DeployInput {
     return (address(timelockMultiAdminShim), urm, governorHelper, proposer);
   }
 
-  function onlyDeployShimAndURM() external returns (address, URMCompoundTimelock, CompoundGovernorHelper, address) {
+  function onlyDeployShimAndURM() external returns (address, URMCompoundManager, CompoundGovernorHelper, address) {
     setUp();
     _step1_deployShimAndURM();
     return (address(timelockMultiAdminShim), urm, governorHelper, proposer);
@@ -78,7 +78,7 @@ contract DeployScriptsIntegrationTest is Test, DeployInput {
 
   function onlyProposeTransferTimelockAdminToShim(address _timelockMultiAdminShim)
     external
-    returns (address, URMCompoundTimelock, CompoundGovernorHelper, address)
+    returns (address, URMCompoundManager, CompoundGovernorHelper, address)
   {
     _step2__proposeTransferTimelockAdminToShim(_timelockMultiAdminShim);
     _step3_acceptAdminFromShim(_timelockMultiAdminShim);

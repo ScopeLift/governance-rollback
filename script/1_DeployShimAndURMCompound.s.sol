@@ -11,10 +11,10 @@ import {Script} from "forge-std/Script.sol";
 import {DeployInput} from "script/DeployInput.sol";
 import {BaseLogger} from "script/BaseLogger.sol";
 import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
-import {URMCompoundTimelock} from "src/contracts/urm/URMCompoundTimelock.sol";
+import {URMCompoundManager} from "src/contracts/urm/URMCompoundManager.sol";
 
 /// @title DeployShimAndURM
-/// @notice Script to deploy the TimelockMultiAdminShim and URMCompoundTimelock contracts
+/// @notice Script to deploy the TimelockMultiAdminShim and URMCompoundManager contracts
 /// @dev This script deploys both contracts with the correct configuration
 contract DeployShimAndURMCompound is Script, BaseLogger, DeployInput {
   function _computeURMAddress() internal view returns (address) {
@@ -23,7 +23,7 @@ contract DeployShimAndURMCompound is Script, BaseLogger, DeployInput {
     return vm.computeCreateAddress(deployer, nextNonce);
   }
 
-  function run() public returns (TimelockMultiAdminShim, URMCompoundTimelock) {
+  function run() public returns (TimelockMultiAdminShim, URMCompoundManager) {
     vm.startBroadcast();
 
     // Compute the URM address
@@ -36,7 +36,7 @@ contract DeployShimAndURMCompound is Script, BaseLogger, DeployInput {
       _executors // executors are the compute URM address
     );
 
-    URMCompoundTimelock urm = new URMCompoundTimelock(
+    URMCompoundManager urm = new URMCompoundManager(
       address(timelockMultiAdminShim), // Target is the shim address
       COMPOUND_TIMELOCK, // admin is the compound timelock
       GUARDIAN, // Address that can queue, cancel and execute rollback
@@ -47,7 +47,7 @@ contract DeployShimAndURMCompound is Script, BaseLogger, DeployInput {
     vm.stopBroadcast();
 
     _log("TimelockMultiAdminShim", address(timelockMultiAdminShim));
-    _log("URMCompoundTimelock", address(urm));
+    _log("URMCompoundManager", address(urm));
 
     if (_executors[0] != address(urm)) {
       _log("URM address", address(urm));

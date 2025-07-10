@@ -4,7 +4,7 @@ pragma solidity ^0.8.30;
 import {URMCore} from "contracts/URMCore.sol";
 import {ITimelockControllerTarget} from "interfaces/ITimelockControllerTarget.sol";
 
-/// @title URMTimelockController
+/// @title URMOZManager
 /// @author [ScopeLift](https://scopelift.co)
 /// @notice Integrates URMCore with an OpenZeppelin-style TimelockController as the execution target.
 /// @dev This contract implements the rollback proposal lifecycle using OZ's TimelockController interface.
@@ -13,7 +13,7 @@ import {ITimelockControllerTarget} from "interfaces/ITimelockControllerTarget.so
 ///      Usecase:
 ///        - Use this contract when your system uses OpenZeppelin's TimelockController, typically found in
 /// Governor-based governance setups.
-///      Key Differences from URMCompoundTimelock:
+///      Key Differences from URMCompoundManager:
 ///        - Calls OZ's `scheduleBatch`, `cancel`, and `executeBatch` on the timelock target.
 ///        - Computes rollback IDs using `hashOperationBatch` with a salt derived from the contract address and
 /// description.
@@ -24,7 +24,7 @@ import {ITimelockControllerTarget} from "interfaces/ITimelockControllerTarget.so
 /// TimelockController API.
 /// @dev Source:
 /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/ba35d580f47ba90494eb9f3d26f58f7949b10c67/contracts/governance/TimelockController.sol
-contract URMTimelockController is URMCore {
+contract URMOZManager is URMCore {
   /*///////////////////////////////////////////////////////////////
                           Constructor
   //////////////////////////////////////////////////////////////*/
