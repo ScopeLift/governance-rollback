@@ -20,7 +20,7 @@ import {ITimelockControllerTarget} from "interfaces/ITimelockControllerTarget.so
 ///        - Delay is fetched via `getMinDelay()` on the timelock.
 ///        - No per-transaction queueing — batch is scheduled/executed as a whole.
 ///      Requirements:
-///        - The `TARGET` must conform to the `ITimelockControllerTarget` interface, which mirrors the OZ
+///        - The `TARGET_TIMELOCK` must conform to the `ITimelockControllerTarget` interface, which mirrors the OZ
 /// TimelockController API.
 /// @dev Source:
 /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/ba35d580f47ba90494eb9f3d26f58f7949b10c67/contracts/governance/TimelockController.sol
@@ -41,7 +41,7 @@ contract URMTimelockController is URMCore {
                           Overrides
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Returns the rollback ID for a given set of parameters.
+  /// @notice Returns the rollback id for a given set of parameters.
   /// @param _targets The targets of the transactions.
   /// @param _values The values of the transactions.
   /// @param _calldatas The calldatas of the transactions.
@@ -58,12 +58,12 @@ contract URMTimelockController is URMCore {
     return uint256(_getRollbackHash(_targets, _values, _calldatas, _description));
   }
 
-  /// @notice Returns the delay of the timelock target.
-  /// @return The delay of the timelock target.
+  /// @notice Returns the minimum delay required by the timelock target before a queued rollback can be executed.
+  /// @return The delay in seconds that must elapse between queueing and executing a rollback.
   /// @dev Source:
   /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/ba35d580f47ba90494eb9f3d26f58f7949b10c67/contracts/governance/TimelockController.sol#L224-L226
   function _delay() internal view override returns (uint256) {
-    return ITimelockControllerTarget(TARGET).getMinDelay();
+    return ITimelockControllerTarget(TARGET_TIMELOCK).getMinDelay();
   }
 
   /// @notice Schedules a rollback to the timelock target.
@@ -79,7 +79,7 @@ contract URMTimelockController is URMCore {
     bytes[] memory _calldatas,
     string memory _description
   ) internal override {
-    ITimelockControllerTarget(TARGET).scheduleBatch(
+    ITimelockControllerTarget(TARGET_TIMELOCK).scheduleBatch(
       _targets, _values, _calldatas, 0, _timelockSalt(_description), _delay()
     );
   }
@@ -97,7 +97,7 @@ contract URMTimelockController is URMCore {
     bytes[] memory _calldatas,
     string memory _description
   ) internal override {
-    ITimelockControllerTarget(TARGET).cancel(_getRollbackHash(_targets, _values, _calldatas, _description));
+    ITimelockControllerTarget(TARGET_TIMELOCK).cancel(_getRollbackHash(_targets, _values, _calldatas, _description));
   }
 
   /// @notice Executes a rollback on the timelock target.
@@ -113,7 +113,7 @@ contract URMTimelockController is URMCore {
     bytes[] memory _calldatas,
     string memory _description
   ) internal override {
-    ITimelockControllerTarget(TARGET).executeBatch{value: msg.value}(
+    ITimelockControllerTarget(TARGET_TIMELOCK).executeBatch{value: msg.value}(
       _targets, _values, _calldatas, 0, _timelockSalt(_description)
     );
   }
@@ -145,7 +145,7 @@ contract URMTimelockController is URMCore {
     bytes[] memory _calldatas,
     string memory _description
   ) internal view returns (bytes32) {
-    return ITimelockControllerTarget(TARGET).hashOperationBatch(
+    return ITimelockControllerTarget(TARGET_TIMELOCK).hashOperationBatch(
       _targets, _values, _calldatas, 0, _timelockSalt(_description)
     );
   }

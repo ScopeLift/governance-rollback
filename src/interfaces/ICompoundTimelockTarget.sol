@@ -3,7 +3,7 @@ pragma solidity ^0.8.30;
 
 /// @title ICompoundTimelockTarget
 /// @author [ScopeLift](https://scopelift.co)
-/// @notice Minimal interface for interacting with a timelock-compatible target used by URM.
+/// @notice Minimal interface for interacting with a Compound timelock-compatible target used by URM.
 /// @dev This interface represents a simplified subset of the
 ///      [ICompoundTimelock](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/6079eb3f01d5a37ae23e7e72d6909852566bc2e3/contracts/vendor/compound/ICompoundTimelock.sol)
 ///      contract, tailored for use by URM.

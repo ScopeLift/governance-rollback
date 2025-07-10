@@ -9,7 +9,7 @@ interface IURM {
                      Public Storage 
   //////////////////////////////////////////////////////////////*/
 
-  function TARGET() external view returns (address);
+  function TARGET_TIMELOCK() external view returns (address);
 
   function admin() external view returns (address);
 
