@@ -7,11 +7,13 @@ import {TimelockController} from "@openzeppelin/contracts/governance/TimelockCon
 // Internal imports
 import {Test} from "forge-std/Test.sol";
 import {URMOZManager} from "src/contracts/urm/URMOZManager.sol";
+import {OZGovernorHelper} from "test/helpers/OZGovernorHelper.sol";
 
 // Deploy scripts
 import {URMOZDeployInput} from "script/URMOZDeployInput.sol";
 import {DeployURMOZ} from "script/1_DeployURMOZ.s.sol";
 import {GrantRolesToURMOZ} from "script/2_GrantRolesToURMOZ.s.sol";
+import {Proposal} from "test/helpers/Proposal.sol";
 
 /// @title Integration Tests for URMOZManager
 /// @notice Tests the full deployment and governance lifecycle for OZ-style timelocks
@@ -20,11 +22,31 @@ contract URMOZDeploymentIntegrationTest is Test, URMOZDeployInput {
   // Test state
   URMOZManager public urm;
 
+  // Helper contract for governance operations
+  OZGovernorHelper public governorHelper;
+
+  address public proposer;
+
+  bytes32 public proposerRole;
+  bytes32 public executorRole;
+  bytes32 public cancellerRole;
+
   function setUp() public {
     string memory rpcUrl = vm.envString("MAINNET_RPC_URL");
     uint256 forkBlock = 22_781_735;
     // Create fork of mainnet
     vm.createSelectFork(rpcUrl, forkBlock);
+
+    // Initialize the governor helper
+    governorHelper = new OZGovernorHelper();
+    governorHelper.setUp();
+
+    // Set the proposer
+    proposer = governorHelper.getMajorDelegate(0);
+
+    proposerRole = TimelockController(OZ_TIMELOCK).PROPOSER_ROLE();
+    executorRole = TimelockController(OZ_TIMELOCK).EXECUTOR_ROLE();
+    cancellerRole = TimelockController(OZ_TIMELOCK).CANCELLER_ROLE();
   }
 
   /*///////////////////////////////////////////////////////////////
@@ -36,17 +58,17 @@ contract URMOZDeploymentIntegrationTest is Test, URMOZDeployInput {
     URM_OZ_MANAGER = address(urm);
   }
 
-  function runDeployScriptsForIntegrationTest() external returns (address, URMOZManager) {
+  function runDeployScriptsForIntegrationTest() external returns (URMOZManager) {
     setUp();
     _step1_deployURMOZ();
     _step2_grantRolesToURMOZ();
-    return (address(urm), urm);
+    return (urm);
   }
 
-  function onlyDeployURMOZ() external returns (address, URMOZManager) {
+  function onlyDeployURMOZ() external returns (URMOZManager) {
     setUp();
     _step1_deployURMOZ();
-    return (address(urm), urm);
+    return (urm);
   }
 
   /*///////////////////////////////////////////////////////////////
@@ -66,38 +88,37 @@ contract URMOZDeploymentIntegrationTest is Test, URMOZDeployInput {
 
   /// @notice Test the grant roles proposal using the actual script
   function _step2_grantRolesToURMOZ() internal {
-    // TODO: Implement step 2 verification
-    // This function is intentionally empty for now as requested
+    // Generate the proposal using the script
+    GrantRolesToURMOZ grantRolesScript = new GrantRolesToURMOZ();
+    (address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description) =
+      grantRolesScript.generateProposal(address(urm));
+
+    Proposal memory proposal = Proposal(targets, values, calldatas, description);
+
+    // Submit, pass, schedule, and execute the proposal
+    governorHelper.submitPassScheduleAndExecuteProposalWithRoll(proposer, proposal);
   }
 
   /// @notice Test the complete governance workflow: deploy → grant roles
-  function test_CompleteGovernanceWorkflow() public {
+  function test_CompleteOZGovernanceWorkflow() public {
     // Step 1: Deploy contracts
     _step1_deployURMOZ();
 
-    // Verify Step 1
     assertEq(address(urm.TARGET_TIMELOCK()), OZ_TIMELOCK);
     assertEq(urm.admin(), OZ_GOVERNOR);
     assertEq(urm.guardian(), GUARDIAN);
     assertEq(urm.rollbackQueueableDuration(), ROLLBACK_QUEUEABLE_DURATION);
     assertEq(urm.MIN_ROLLBACK_QUEUEABLE_DURATION(), MIN_ROLLBACK_QUEUEABLE_DURATION);
 
+    assertFalse(TimelockController(OZ_TIMELOCK).hasRole(proposerRole, address(urm)));
+    assertFalse(TimelockController(OZ_TIMELOCK).hasRole(executorRole, address(urm)));
+    assertFalse(TimelockController(OZ_TIMELOCK).hasRole(cancellerRole, address(urm)));
+
+    // Step 2: Grant roles to URM
     _step2_grantRolesToURMOZ();
 
-    // Verify Step 2
-    // TODO: Add verification for step 2 once implemented
-  }
-
-  /// @notice Test only the deployment step
-  function test_Step1_DeployURMOZ() public {
-    // Step 1: Deploy contracts
-    _step1_deployURMOZ();
-
-    // Verify Step 1
-    assertEq(address(urm.TARGET_TIMELOCK()), OZ_TIMELOCK);
-    assertEq(urm.admin(), OZ_GOVERNOR);
-    assertEq(urm.guardian(), GUARDIAN);
-    assertEq(urm.rollbackQueueableDuration(), ROLLBACK_QUEUEABLE_DURATION);
-    assertEq(urm.MIN_ROLLBACK_QUEUEABLE_DURATION(), MIN_ROLLBACK_QUEUEABLE_DURATION);
+    assertTrue(TimelockController(OZ_TIMELOCK).hasRole(proposerRole, address(urm)));
+    assertTrue(TimelockController(OZ_TIMELOCK).hasRole(executorRole, address(urm)));
+    assertTrue(TimelockController(OZ_TIMELOCK).hasRole(cancellerRole, address(urm)));
   }
 }
