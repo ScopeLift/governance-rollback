@@ -3,9 +3,6 @@ pragma solidity 0.8.30;
 
 // External imports
 import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompoundTimelock.sol";
-import {GovernorTimelockControl} from "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IComp} from "@scopelift/compound-governance-upgrade/contracts/interfaces/IComp.sol";
 
 // Internal imports
 import {Test} from "forge-std/Test.sol";
@@ -14,7 +11,7 @@ import {URMCompoundManager} from "src/contracts/urm/URMCompoundManager.sol";
 import {CompoundGovernorHelper, ICompoundGovernor} from "test/helpers/CompoundGovernorHelper.sol";
 
 // Deploy scripts
-import {DeployInput} from "script/DeployInput.sol";
+import {URMCompoundDeployInput} from "script/URMCompoundDeployInput.sol";
 import {DeployShimAndURMCompound} from "script/1_DeployShimAndURMCompound.s.sol";
 import {ProposeTransferOwnershipToShim} from "script/2_ProposeTransferOwnershipToShim.s.sol";
 import {AcceptAdmin} from "script/3_AcceptAdmin.s.sol";
@@ -23,7 +20,7 @@ import {Proposal} from "test/helpers/Proposal.sol";
 /// @title Integration Tests for TimelockMultiAdminShim and URMCompoundManager
 /// @notice Tests the full deployment and governance lifecycle
 /// @dev This test suite requires MAINNET_RPC_URL environment variable to be set
-contract URMCompoundDeploymentIntegrationTest is Test, DeployInput {
+contract URMCompoundDeploymentIntegrationTest is Test, URMCompoundDeployInput {
   // Test state
   TimelockMultiAdminShim public timelockMultiAdminShim;
   URMCompoundManager public urm;
@@ -53,7 +50,7 @@ contract URMCompoundDeploymentIntegrationTest is Test, DeployInput {
   //////////////////////////////////////////////////////////////*/
 
   function _updateDeployInputAddresses() internal {
-    // Update the DeployInput addresses for the proposal scripts
+    // Update the URMCompoundDeployInput addresses for the proposal scripts
     // Since these are not constants in DeployInput, we can update them directly
     TIMELOCK_MULTI_ADMIN_SHIM = address(timelockMultiAdminShim);
     URM_COMPOUND_MANAGER = address(urm);
@@ -96,7 +93,7 @@ contract URMCompoundDeploymentIntegrationTest is Test, DeployInput {
     _script.setLoggingSilenced(true); // Silence logging
     (timelockMultiAdminShim, urm) = _script.run();
 
-    // Update DeployInput addresses for the script
+    // Update URMCompoundDeployInput addresses for the script
     _updateDeployInputAddresses();
   }
 
