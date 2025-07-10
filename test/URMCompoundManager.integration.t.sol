@@ -11,13 +11,13 @@ import {FakeProtocolContract} from "test/fakes/FakeProtocolContract.sol";
 import {CompoundGovernorHelper} from "test/helpers/CompoundGovernorHelper.sol";
 import {FakeProtocolRollbackTestHelper} from "test/fakes/FakeProtocolRollbackTestHelper.sol";
 import {URMCompoundManager} from "src/contracts/urm/URMCompoundManager.sol";
-import {DeployInput} from "script/DeployInput.sol";
+import {URMCompoundDeployInput} from "script/URMCompoundDeployInput.sol";
 import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
 import {ProposalState} from "src/types/GovernanceTypes.sol";
 import {URMCore} from "src/contracts/URMCore.sol";
 import {Proposal} from "test/helpers/Proposal.sol";
 
-contract URMCompoundManagerIntegrationTest is Test, DeployInput {
+contract URMCompoundManagerIntegrationTest is Test, URMCompoundDeployInput {
   FakeProtocolContract public fakeProtocolContract;
   CompoundGovernorHelper public govHelper;
   FakeProtocolRollbackTestHelper public rollbackHelper;
