@@ -5,7 +5,7 @@ import {Test, console2} from "forge-std/Test.sol";
 import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompoundTimelock.sol";
 
 // Internal imports
-import {DeployInput} from "script/DeployInput.sol";
+import {URMCompoundDeployInput} from "script/URMCompoundDeployInput.sol";
 import {Proposal} from "test/helpers/Proposal.sol";
 
 interface ICompoundGovernor {
@@ -43,7 +43,7 @@ interface ICompoundGovernor {
   function state(uint256 proposalId) external view returns (uint8);
 }
 
-contract CompoundGovernorHelper is Test, DeployInput {
+contract CompoundGovernorHelper is Test, URMCompoundDeployInput {
   ICompoundGovernor public governor;
   ICompoundTimelock public timelock;
   address public whitelistGuardian;

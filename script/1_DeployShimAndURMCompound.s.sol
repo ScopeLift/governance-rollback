@@ -8,7 +8,7 @@ import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompou
 import {Script} from "forge-std/Script.sol";
 
 // Internal imports
-import {DeployInput} from "script/DeployInput.sol";
+import {URMCompoundDeployInput} from "script/URMCompoundDeployInput.sol";
 import {BaseLogger} from "script/BaseLogger.sol";
 import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
 import {URMCompoundManager} from "src/contracts/urm/URMCompoundManager.sol";
@@ -16,7 +16,7 @@ import {URMCompoundManager} from "src/contracts/urm/URMCompoundManager.sol";
 /// @title DeployShimAndURMCompound
 /// @notice Script to deploy the TimelockMultiAdminShim and URMCompoundManager contracts
 /// @dev This script deploys both contracts with the correct configuration
-contract DeployShimAndURMCompound is Script, BaseLogger, DeployInput {
+contract DeployShimAndURMCompound is Script, BaseLogger, URMCompoundDeployInput {
   function _computeURMAddress() internal view returns (address) {
     address deployer = tx.origin;
     uint256 nextNonce = vm.getNonce(deployer) + 1;

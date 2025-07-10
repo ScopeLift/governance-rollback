@@ -10,14 +10,14 @@ import {CompoundGovernorHelper} from "test/helpers/CompoundGovernorHelper.sol";
 import {FakeProtocolRollbackTestHelper} from "test/fakes/FakeProtocolRollbackTestHelper.sol";
 import {URMCompoundManager} from "src/contracts/urm/URMCompoundManager.sol";
 import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
-import {DeployInput} from "script/DeployInput.sol";
+import {URMCompoundDeployInput} from "script/URMCompoundDeployInput.sol";
 import {ProposeTransferOwnershipToShim} from "script/2_ProposeTransferOwnershipToShim.s.sol";
 import {Proposal} from "test/helpers/Proposal.sol";
 
 /// @notice Integration tests to verify the impact of the governance upgrade on existing proposals at different
 /// lifecycle stages
 /// @dev - docs/COMPOUND_GOVERNANCE_UPGRADE_IMPACT.md
-contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, DeployInput {
+contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, URMCompoundDeployInput {
   FakeProtocolContract public fakeProtocolContract;
   CompoundGovernorHelper public govHelper;
   FakeProtocolRollbackTestHelper public rollbackHelper;
