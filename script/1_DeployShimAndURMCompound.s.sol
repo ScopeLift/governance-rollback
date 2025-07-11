@@ -13,7 +13,7 @@ import {BaseLogger} from "script/BaseLogger.sol";
 import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
 import {URMCompoundManager} from "src/contracts/urm/URMCompoundManager.sol";
 
-/// @title DeployShimAndURM
+/// @title DeployShimAndURMCompound
 /// @notice Script to deploy the TimelockMultiAdminShim and URMCompoundManager contracts
 /// @dev This script deploys both contracts with the correct configuration
 contract DeployShimAndURMCompound is Script, BaseLogger, DeployInput {
