@@ -3,6 +3,9 @@
 
 pragma solidity 0.8.30;
 
+// @notice Input values for URMOZ deployment
+// @dev These values are based on Obol's governance setup (OpenZeppelin Governor + TimelockController)
+//      chosen for convenience in testing. In production, these would be specific to the target protocol.
 contract URMOZDeployInput {
   // OpenZeppelin-style TimelockController contract
   address payable public constant OZ_TIMELOCK = payable(0xCdBf527842Ab04Da548d33EB09d03DB831381Fb0);
