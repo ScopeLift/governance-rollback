@@ -11,7 +11,7 @@ contract URMOZDeployInput {
   address public constant OZ_GOVERNOR = 0xcB1622185A0c62A80494bEde05Ba95ef29Fbf85c;
 
   // Address that can queue, cancel and execute rollback
-  // NOTE: This is the address which deployed the obol. This should be updated to Obol's trusted multisig.
+  // NOTE: This is the address which deployed the Obol governor. This should be updated to Obol's trusted multisig.
   address public constant GUARDIAN = 0x02b5D1Fd67246c0513223D320901474aA20Bf973;
 
   // Time duration during which a proposed rollback can be queued for execution.
