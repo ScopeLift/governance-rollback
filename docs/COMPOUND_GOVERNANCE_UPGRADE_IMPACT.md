@@ -15,7 +15,7 @@ The upgrade involves:
       - `admin` = Governor
       - `timelock` = Compound Timelock
       - `executor` = URM
-    -  `UpgradeRegressionManager` (URM) with 
+    - `URMCompoundManager` (URM) with 
        - `admin` = Compound Timelock
        - `guardian` = Compound trusted multisig
        - `target` = `TimelockMultiAdminShim`
