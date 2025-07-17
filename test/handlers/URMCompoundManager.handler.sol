@@ -13,6 +13,7 @@ import {FakeProtocolContract} from "test/fakes/FakeProtocolContract.sol";
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 import {Rollback} from "interfaces/IURM.sol";
 import {RollbackSet, LibRollbackSet, RollbackProposal} from "test/helpers/RollbackSet.sol";
+import {URMCore} from "contracts/URMCore.sol";
 
 contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   using LibRollbackSet for RollbackSet;
@@ -181,13 +182,13 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   /// @notice Execute a valid rollback proposal
   /// @param _randomIndex Used to randomly select an executable proposal
   function execute(uint256 _randomIndex) public countCall("execute") {
-    // Only proceed if there are active proposals
-    if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Active)) {
+    // Only proceed if there are executable proposals
+    if (!_rollbackSet.hasExecutableProposals()) {
       return;
     }
 
-    // Get a random active proposal
-    RollbackProposal memory _randomProposal = _rollbackSet.randByState(IGovernor.ProposalState.Active, _randomIndex);
+    // Get a random executable proposal
+    RollbackProposal memory _randomProposal = _rollbackSet.randExecutable(_randomIndex);
 
     // Execute the proposal
     vm.prank(guardian);
@@ -229,17 +230,13 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   /// @notice Cancel a valid rollback proposal
   /// @param _randomIndex Used to randomly select a cancellable proposal
   function cancel(uint256 _randomIndex) public countCall("cancel") {
-    IGovernor.ProposalState[] memory _validStates = new IGovernor.ProposalState[](2);
-    _validStates[0] = IGovernor.ProposalState.Active;
-    _validStates[1] = IGovernor.ProposalState.Queued;
-
-    // Only proceed if there are proposals in valid states for cancellation
-    if (!_rollbackSet.hasProposalsInStates(_validStates)) {
+    // Only proceed if there are queued proposals
+    if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Queued)) {
       return;
     }
 
-    // Get a random queued/active proposal
-    RollbackProposal memory _randomProposal = _rollbackSet.randByStates(_validStates, _randomIndex);
+    // Get a random queued proposal
+    RollbackProposal memory _randomProposal = _rollbackSet.randByState(IGovernor.ProposalState.Queued, _randomIndex);
 
     // Cancel the proposal
     vm.prank(guardian);
@@ -280,20 +277,28 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   /// @notice Attempt to execute a rollback proposal that's not meant to be executed
   /// @param _randomIndex Used to randomly select a proposal from invalid states
   function invalidExecute(uint256 _randomIndex) public countCall("invalidExecute") {
-    // Get a random proposal from invalid states for execution
-    IGovernor.ProposalState[] memory _invalidStates = new IGovernor.ProposalState[](5);
+    // Get invalid states for execution (all states except Executed)
+    IGovernor.ProposalState[] memory _invalidStates = new IGovernor.ProposalState[](4);
     _invalidStates[0] = IGovernor.ProposalState.Pending;
-    _invalidStates[1] = IGovernor.ProposalState.Queued;
-    _invalidStates[2] = IGovernor.ProposalState.Canceled;
+    _invalidStates[1] = IGovernor.ProposalState.Canceled;
+    _invalidStates[2] = IGovernor.ProposalState.Expired;
     _invalidStates[3] = IGovernor.ProposalState.Executed;
-    _invalidStates[4] = IGovernor.ProposalState.Expired;
 
-    // Only proceed if there are proposals in invalid states
-    if (!_rollbackSet.hasProposalsInStates(_invalidStates)) {
+    // Check if we have any invalid proposals or non-executable queued proposals
+    bool _hasInvalidProposals = _rollbackSet.hasProposalsInStates(_invalidStates);
+    bool _hasNonExecutableQueued = _rollbackSet.hasQueuedProposalsWhichAreNotExecutable();
+
+    if (!_hasInvalidProposals && !_hasNonExecutableQueued) {
       return;
     }
 
-    RollbackProposal memory _randomProposal = _rollbackSet.randByStates(_invalidStates, _randomIndex);
+    // Use the index to deterministically choose between invalid states and non-executable queued
+    RollbackProposal memory _randomProposal;
+    if (_randomIndex % 2 == 0 || !_hasNonExecutableQueued) {
+      _randomProposal = _rollbackSet.randByStates(_invalidStates, _randomIndex);
+    } else {
+      _randomProposal = _rollbackSet.randQueuedButNotExecutable(_randomIndex);
+    }
 
     // Attempt to execute the proposal (should revert)
     vm.prank(guardian);
@@ -373,13 +378,13 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     // Assume caller is not the guardian
     vm.assume(_caller != guardian);
 
-    // Only proceed if there are active proposals
-    if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Active)) {
+    // Only proceed if there are executable proposals
+    if (!_rollbackSet.hasExecutableProposals()) {
       return;
     }
 
-    // Get a random active proposal
-    RollbackProposal memory _randomProposal = _rollbackSet.randByState(IGovernor.ProposalState.Active, _randomIndex);
+    // Get a random executable proposal
+    RollbackProposal memory _randomProposal = _rollbackSet.randExecutable(_randomIndex);
 
     // Attempt to execute with a non-guardian caller (should revert)
     vm.prank(_caller);
@@ -401,17 +406,12 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     // Assume caller is not the guardian
     vm.assume(_caller != guardian);
 
-    // Get a random active/queued proposal
-    IGovernor.ProposalState[] memory _validStates = new IGovernor.ProposalState[](2);
-    _validStates[0] = IGovernor.ProposalState.Active;
-    _validStates[1] = IGovernor.ProposalState.Queued;
-
-    // Only proceed if there are proposals in valid states for cancellation
-    if (!_rollbackSet.hasProposalsInStates(_validStates)) {
+    // Only proceed if there are queued proposals
+    if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Queued)) {
       return;
     }
 
-    RollbackProposal memory _randomProposal = _rollbackSet.randByStates(_validStates, _randomIndex);
+    RollbackProposal memory _randomProposal = _rollbackSet.randByState(IGovernor.ProposalState.Queued, _randomIndex);
 
     // Attempt to cancel with a non-guardian caller (should revert)
     vm.prank(_caller);
@@ -463,8 +463,14 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     _rollbackSet.forEach(_func);
   }
 
-  function forEachRollbackByState(IGovernor.ProposalState _state, function(RollbackProposal memory) external _func) public {
+  function forEachRollbackByState(IGovernor.ProposalState _state, function(RollbackProposal memory) external _func)
+    public
+  {
     _rollbackSet.forEachByState(_state, _func);
+  }
+
+  function forEachRollbackQueuedButNotExecutable(function(RollbackProposal memory) external _func) public {
+    _rollbackSet.forEachQueuedButNotExecutable(_func);
   }
 
   function getRollbackSetCount() public view returns (uint256) {

@@ -1212,6 +1212,149 @@ contract State is URMOZManagerTest {
   }
 }
 
+contract IsRollbackExecutable is URMOZManagerTest {
+  function testFuzz_RevertIf_RollbackDoesNotExist(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = urm.getRollbackId(_targets, _values, _calldatas, _description);
+
+    vm.expectRevert(abi.encodeWithSelector(URMCore.URM__NonExistentRollback.selector, _rollbackId));
+    urm.isRollbackExecutable(_rollbackId);
+  }
+
+  function testFuzz_ReturnsFalseForPendingRollback(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
+
+    bool _isExecutable = urm.isRollbackExecutable(_rollbackId);
+    assertFalse(_isExecutable);
+  }
+
+  function testFuzz_ReturnsFalseForCanceledRollback(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
+
+    // Cancel the rollback
+    vm.prank(guardian);
+    urm.cancel(_targets, _values, _calldatas, _description);
+
+    bool _isExecutable = urm.isRollbackExecutable(_rollbackId);
+    assertFalse(_isExecutable);
+  }
+
+  function testFuzz_ReturnsFalseForExecutedRollback(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
+
+    // Warp to executable time and execute
+    vm.warp(block.timestamp + targetTimelock.getMinDelay());
+    vm.prank(guardian);
+    urm.execute(_targets, _values, _calldatas, _description);
+
+    bool _isExecutable = urm.isRollbackExecutable(_rollbackId);
+    assertFalse(_isExecutable);
+  }
+
+  function testFuzz_ReturnsFalseForExpiredRollback(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
+
+    // Warp past the queue expiry time
+    vm.warp(block.timestamp + rollbackQueueableDuration + 1);
+
+    bool _isExecutable = urm.isRollbackExecutable(_rollbackId);
+    assertFalse(_isExecutable);
+  }
+
+  function testFuzz_ReturnsFalseForQueuedRollbackBeforeDelay(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
+
+    // Warp to just before the delay period
+    vm.warp(block.timestamp + targetTimelock.getMinDelay() - 1);
+
+    bool _isExecutable = urm.isRollbackExecutable(_rollbackId);
+    assertFalse(_isExecutable);
+  }
+
+  function testFuzz_ReturnsTrueForQueuedRollbackAfterDelay(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
+
+    // Warp to after the delay period
+    vm.warp(block.timestamp + targetTimelock.getMinDelay() + 1);
+
+    bool _isExecutable = urm.isRollbackExecutable(_rollbackId);
+    assertTrue(_isExecutable);
+  }
+
+  function testFuzz_ReturnsTrueForQueuedRollbackAtExactDelay(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _proposeAndQueueRollback(_targets, _values, _calldatas, _description);
+
+    // Warp to exactly the delay period
+    vm.warp(block.timestamp + targetTimelock.getMinDelay());
+
+    bool _isExecutable = urm.isRollbackExecutable(_rollbackId);
+    assertTrue(_isExecutable);
+  }
+}
+
 contract SetGuardian is URMOZManagerTest {
   function test_SetsGuardian(address _newGuardian) external {
     _assumeSafeGuardian(_newGuardian);

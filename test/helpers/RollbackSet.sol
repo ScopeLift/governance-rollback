@@ -48,7 +48,39 @@ library LibRollbackSet {
     return _count;
   }
 
-  function getByState(RollbackSet storage _s, IGovernor.ProposalState _state) internal view returns (RollbackProposal[] memory) {
+  function countQueuedButExecutable(RollbackSet storage _s) internal view returns (uint256) {
+    // Get all queued proposals
+    RollbackProposal[] memory _queuedProposals = getByState(_s, IGovernor.ProposalState.Queued);
+    uint256 _count = 0;
+
+    for (uint256 _i = 0; _i < _queuedProposals.length; _i++) {
+      if (URMCore(_s.urm).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
+        _count++;
+      }
+    }
+
+    return _count;
+  }
+
+  function countQueuedButNotExecutable(RollbackSet storage _s) internal view returns (uint256) {
+    // Get all queued proposals
+    RollbackProposal[] memory _queuedProposals = getByState(_s, IGovernor.ProposalState.Queued);
+    uint256 _count = 0;
+
+    for (uint256 _i = 0; _i < _queuedProposals.length; _i++) {
+      if (!URMCore(_s.urm).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
+        _count++;
+      }
+    }
+
+    return _count;
+  }
+
+  function getByState(RollbackSet storage _s, IGovernor.ProposalState _state)
+    internal
+    view
+    returns (RollbackProposal[] memory)
+  {
     // Count matching proposals first
     uint256 _count = 0;
     for (uint256 _i = 0; _i < _s.proposals.length; _i++) {
@@ -90,6 +122,82 @@ library LibRollbackSet {
     revert("No proposals available in requested state");
   }
 
+  function randQueuedButNotExecutable(RollbackSet storage _s, uint256 _seed)
+    internal
+    view
+    returns (RollbackProposal memory)
+  {
+    // Get all queued proposals
+    RollbackProposal[] memory _queuedProposals = getByState(_s, IGovernor.ProposalState.Queued);
+
+    if (_queuedProposals.length == 0) {
+      revert("No queued proposals available");
+    }
+
+    // Count how many are not executable
+    uint256 _count = 0;
+    for (uint256 _i = 0; _i < _queuedProposals.length; _i++) {
+      if (!URMCore(_s.urm).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
+        _count++;
+      }
+    }
+
+    if (_count == 0) {
+      revert("No queued proposals available which are not executable");
+    }
+
+    // Create array for non-executable proposals
+    RollbackProposal[] memory _nonExecutableProposals = new RollbackProposal[](_count);
+    uint256 _index = 0;
+
+    // Populate the array with non-executable proposals
+    for (uint256 _i = 0; _i < _queuedProposals.length; _i++) {
+      if (!URMCore(_s.urm).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
+        _nonExecutableProposals[_index] = _queuedProposals[_i];
+        _index++;
+      }
+    }
+
+    // Use seed to get a random one
+    return _nonExecutableProposals[_seed % _count];
+  }
+
+  function randExecutable(RollbackSet storage _s, uint256 _seed) internal view returns (RollbackProposal memory) {
+    // Get all queued proposals
+    RollbackProposal[] memory _queuedProposals = getByState(_s, IGovernor.ProposalState.Queued);
+
+    if (_queuedProposals.length == 0) {
+      revert("No queued proposals available");
+    }
+
+    // Count how many are executable
+    uint256 _count = 0;
+    for (uint256 _i = 0; _i < _queuedProposals.length; _i++) {
+      if (URMCore(_s.urm).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
+        _count++;
+      }
+    }
+
+    if (_count == 0) {
+      revert("No queued proposals available for execution");
+    }
+
+    // Create array for executable proposals
+    RollbackProposal[] memory _executableProposals = new RollbackProposal[](_count);
+    uint256 _index = 0;
+
+    // Populate the array with executable proposals
+    for (uint256 _i = 0; _i < _queuedProposals.length; _i++) {
+      if (URMCore(_s.urm).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
+        _executableProposals[_index] = _queuedProposals[_i];
+        _index++;
+      }
+    }
+
+    // Use seed to get a random one
+    return _executableProposals[_seed % _count];
+  }
+
   function randByStates(RollbackSet storage _s, IGovernor.ProposalState[] memory _states, uint256 _seed)
     internal
     view
@@ -122,13 +230,29 @@ library LibRollbackSet {
     return countByState(_s, _state) > 0;
   }
 
-  function hasProposalsInStates(RollbackSet storage _s, IGovernor.ProposalState[] memory _states) internal view returns (bool) {
+  function hasProposalsInStates(RollbackSet storage _s, IGovernor.ProposalState[] memory _states)
+    internal
+    view
+    returns (bool)
+  {
     for (uint256 i = 0; i < _states.length; i++) {
       if (countByState(_s, _states[i]) > 0) {
         return true;
       }
     }
     return false;
+  }
+
+  function hasQueuedProposalsWhichAreExecutable(RollbackSet storage _s) internal view returns (bool) {
+    return countQueuedButExecutable(_s) > 0;
+  }
+
+  function hasQueuedProposalsWhichAreNotExecutable(RollbackSet storage _s) internal view returns (bool) {
+    return countQueuedButNotExecutable(_s) > 0;
+  }
+
+  function hasExecutableProposals(RollbackSet storage _s) internal view returns (bool) {
+    return countQueuedButExecutable(_s) > 0;
   }
 
   function forEach(RollbackSet storage _s, function(RollbackProposal memory) external _func) internal {
@@ -145,6 +269,18 @@ library LibRollbackSet {
     RollbackProposal[] memory _proposals = getByState(_s, _state);
     for (uint256 _i = 0; _i < _proposals.length; _i++) {
       _func(_proposals[_i]);
+    }
+  }
+
+  function forEachQueuedButNotExecutable(
+    RollbackSet storage _s,
+    function(RollbackProposal memory) external _func
+  ) internal {
+    RollbackProposal[] memory _queued = getByState(_s, IGovernor.ProposalState.Queued);
+    for (uint256 i = 0; i < _queued.length; i++) {
+      if (!URMCore(_s.urm).isRollbackExecutable(_queued[i].rollbackId)) {
+        _func(_queued[i]);
+      }
     }
   }
 

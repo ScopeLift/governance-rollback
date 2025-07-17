@@ -162,7 +162,7 @@ contract URMCompoundManagerInvariantTest is Test {
   }
 
   function invariant_cannotExecuteRollbackBeforeTimelockDelay() public {
-    handler.forEachRollbackByState(IGovernor.ProposalState.Queued, this._checkQueuedProposalNotExecutable);
+    handler.forEachRollbackQueuedButNotExecutable(this._checkQueuedProposalNotExecutable);
   }
 
   function _checkQueuedProposalNotExecutable(RollbackProposal memory _proposal) external {
