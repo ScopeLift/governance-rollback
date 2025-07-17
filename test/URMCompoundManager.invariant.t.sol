@@ -37,6 +37,13 @@ contract URMCompoundManagerInvariantTest is Test {
 
     // target the handler for invariant testing
     targetContract(address(handler));
+
+    // Exclude handler iteration functions from fuzzing
+    bytes4[] memory excludeSelectors = new bytes4[](3);
+    excludeSelectors[0] = URMCompoundManagerHandler.forEachRollbackQueuedButNotExecutable.selector;
+    excludeSelectors[1] = URMCompoundManagerHandler.forEachRollbackByState.selector;
+    excludeSelectors[2] = URMCompoundManagerHandler.forEachRollback.selector;
+    excludeSelector(FuzzSelector(address(handler), excludeSelectors));
   }
 
   function invariant_rollbackIdIsUnique() public view {

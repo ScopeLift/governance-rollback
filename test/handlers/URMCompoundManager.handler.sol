@@ -11,9 +11,8 @@ import {console} from "forge-std/console.sol";
 import {URMCompoundManager} from "src/contracts/urm/URMCompoundManager.sol";
 import {FakeProtocolContract} from "test/fakes/FakeProtocolContract.sol";
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
-import {Rollback} from "interfaces/IURM.sol";
 import {RollbackSet, LibRollbackSet, RollbackProposal} from "test/helpers/RollbackSet.sol";
-import {URMCore} from "contracts/URMCore.sol";
+import {RollbackTransactionGenerator} from "test/helpers/RollbackTransactionGenerator.sol";
 
 contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   using LibRollbackSet for RollbackSet;
@@ -34,10 +33,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   mapping(bytes32 => uint256) public calls;
 
   uint256 public ghost_rollbackExistsReverts;
-  uint256 public ghost_randByStateReverts;
-  uint256 public ghost_randByStatesReverts;
   uint256 public ghost_invalidOperationReverts;
-  uint256 public ghost_contractReverts;
   uint256 public ghost_authorizationReverts;
 
   modifier countCall(bytes32 key) {
@@ -60,53 +56,13 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     _rollbackSet.setURM(address(_urm));
   }
 
-  /// @notice Generate a rollback proposal with random transactions
-  /// @param _rollbackFee Fee parameter for randomization
-  /// @param _rollbackGuardian Guardian parameter for randomization
-  /// @return _targets Array of target addresses
-  /// @return _values Array of values
-  /// @return _calldatas Array of calldata
-  function _generateRollback(uint256 _rollbackFee, address _rollbackGuardian)
-    internal
-    view
-    returns (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas)
-  {
-    // Randomly decide between 1 or 2 rollback transactions
-    uint256 _numTransactions = (_rollbackFee % 2) + 1; // 1 or 2
-
-    // Create rollback transaction arrays
-    _targets = new address[](_numTransactions);
-    _values = new uint256[](_numTransactions);
-    _calldatas = new bytes[](_numTransactions);
-
-    for (uint256 _i = 0; _i < _numTransactions; _i++) {
-      // Select a random target for each transaction
-      uint256 _targetIndex = bound(_rollbackFee + _i, 0, targets.length - 1);
-      FakeProtocolContract _target = targets[_targetIndex];
-
-      // Select a random selector for each transaction
-      uint256 _selectorIndex = bound(uint256(uint160(_rollbackGuardian)) + _i, 0, selectors.length - 1);
-      bytes4 _selector = selectors[_selectorIndex];
-
-      _targets[_i] = address(_target);
-      _values[_i] = 0;
-
-      // Encode the calldata based on the selector
-      if (_selector == FakeProtocolContract.setFee.selector) {
-        _calldatas[_i] = abi.encodeWithSelector(_selector, _rollbackFee);
-      } else {
-        _calldatas[_i] = abi.encodeWithSelector(_selector, _rollbackGuardian);
-      }
-    }
-  }
-
   /// @notice Propose a rollback
   /// @param _rollbackFee The new fee
   /// @param _rollbackGuardian The new guardian
-  function propose(uint256 _rollbackFee, address _rollbackGuardian) public countCall("propose") {
+  function propose(uint256 _rollbackFee, address _rollbackGuardian) external countCall("propose") {
     // Get the rollback transactions
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      _generateRollback(_rollbackFee, _rollbackGuardian);
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) = RollbackTransactionGenerator
+      .generateRandomRollbackTransactions(_rollbackFee, _rollbackGuardian, targets, selectors);
 
     // Get the rollback ID
     uint256 _rollbackId = urm.getRollbackId(_targets, _values, _calldatas, DESCRIPTION);
@@ -114,7 +70,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     // Only propose if it doesn't already exist
     if (_rollbackSet.contains(_rollbackId)) {
       ghost_rollbackExistsReverts++;
-      revert("Rollback already exists");
+      return; // Skip instead of reverting
     }
 
     vm.prank(admin);
@@ -133,7 +89,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
 
   /// @notice Queue a valid rollback proposal
   /// @param _randomIndex Used to randomly select a queueable proposal
-  function queue(uint256 _randomIndex) public countCall("queue") {
+  function queue(uint256 _randomIndex) external countCall("queue") {
     // Only proceed if there are pending proposals
     if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Pending)) {
       return;
@@ -149,12 +105,11 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     ) {
       // Success
     } catch {
-      ghost_contractReverts++;
       revert("Unexpected contract revert during valid queue operation");
     }
   }
 
-  function wrapBeforeExpiryAndQueue(uint256 _randomIndex) public countCall("wrapBeforeExpiryAndQueue") {
+  function wrapBeforeExpiryAndQueue(uint256 _randomIndex) external countCall("wrapBeforeExpiryAndQueue") {
     // Only proceed if there are expired proposals
     if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Expired)) {
       return;
@@ -174,14 +129,13 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     ) {
       // Success
     } catch {
-      ghost_contractReverts++;
       revert("Unexpected contract revert during valid wrapBeforeExpiryAndQueue operation");
     }
   }
 
   /// @notice Execute a valid rollback proposal
   /// @param _randomIndex Used to randomly select an executable proposal
-  function execute(uint256 _randomIndex) public countCall("execute") {
+  function execute(uint256 _randomIndex) external countCall("execute") {
     // Only proceed if there are executable proposals
     if (!_rollbackSet.hasExecutableProposals()) {
       return;
@@ -197,12 +151,11 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     ) {
       // Success
     } catch {
-      ghost_contractReverts++;
       revert("Unexpected contract revert during valid execute operation");
     }
   }
 
-  function warpAndExecute(uint256 _randomIndex) public countCall("warpAndExecute") {
+  function warpAndExecute(uint256 _randomIndex) external countCall("warpAndExecute") {
     // Only proceed if there are queued proposals
     if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Queued)) {
       return;
@@ -222,14 +175,13 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     ) {
       // Success
     } catch {
-      ghost_contractReverts++;
       revert("Unexpected contract revert during valid warpAndExecute operation");
     }
   }
 
   /// @notice Cancel a valid rollback proposal
   /// @param _randomIndex Used to randomly select a cancellable proposal
-  function cancel(uint256 _randomIndex) public countCall("cancel") {
+  function cancel(uint256 _randomIndex) external countCall("cancel") {
     // Only proceed if there are queued proposals
     if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Queued)) {
       return;
@@ -245,21 +197,27 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     ) {
       // Success
     } catch {
-      ghost_contractReverts++;
       revert("Unexpected contract revert during valid cancel operation");
     }
   }
 
-  /// @notice Attempt to queue a random rollback proposal (should revert if not in correct state)
-  /// @param _randomIndex Used to randomly select any proposal
-  function invalidQueue(uint256 _randomIndex) public countCall("invalidQueue") {
-    // Only proceed if there are any proposals
-    if (_rollbackSet.count() == 0) {
+  /// @notice Attempt to queue a rollback proposal that's not meant to be queued
+  /// @param _randomIndex Used to randomly select a proposal from invalid states
+  function invalidQueue(uint256 _randomIndex) external countCall("invalidQueue") {
+    // Get invalid states for queueing (all states except Pending)
+    IGovernor.ProposalState[] memory _invalidStates = new IGovernor.ProposalState[](4);
+    _invalidStates[0] = IGovernor.ProposalState.Queued;
+    _invalidStates[1] = IGovernor.ProposalState.Canceled;
+    _invalidStates[2] = IGovernor.ProposalState.Expired;
+    _invalidStates[3] = IGovernor.ProposalState.Executed;
+
+    // Only proceed if there are proposals in invalid states
+    if (!_rollbackSet.hasProposalsInStates(_invalidStates)) {
       return;
     }
 
-    // Get a random proposal regardless of state
-    RollbackProposal memory _randomProposal = _rollbackSet.rand(_randomIndex);
+    // Get a random proposal from invalid states
+    RollbackProposal memory _randomProposal = _rollbackSet.randByStates(_invalidStates, _randomIndex);
 
     // Attempt to queue the proposal which should revert
     vm.prank(guardian);
@@ -276,7 +234,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
 
   /// @notice Attempt to execute a rollback proposal that's not meant to be executed
   /// @param _randomIndex Used to randomly select a proposal from invalid states
-  function invalidExecute(uint256 _randomIndex) public countCall("invalidExecute") {
+  function invalidExecute(uint256 _randomIndex) external countCall("invalidExecute") {
     // Get invalid states for execution (all states except Executed)
     IGovernor.ProposalState[] memory _invalidStates = new IGovernor.ProposalState[](4);
     _invalidStates[0] = IGovernor.ProposalState.Pending;
@@ -293,8 +251,15 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     }
 
     // Use the index to deterministically choose between invalid states and non-executable queued
+
     RollbackProposal memory _randomProposal;
-    if (_randomIndex % 2 == 0 || !_hasNonExecutableQueued) {
+    if (_hasInvalidProposals && _hasNonExecutableQueued) {
+      if (_randomIndex % 2 == 0) {
+        _randomProposal = _rollbackSet.randByStates(_invalidStates, _randomIndex);
+      } else {
+        _randomProposal = _rollbackSet.randQueuedButNotExecutable(_randomIndex);
+      }
+    } else if (_hasInvalidProposals) {
       _randomProposal = _rollbackSet.randByStates(_invalidStates, _randomIndex);
     } else {
       _randomProposal = _rollbackSet.randQueuedButNotExecutable(_randomIndex);
@@ -315,7 +280,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
 
   /// @notice Attempt to cancel a rollback proposal that's not meant to be cancelled
   /// @param _randomIndex Used to randomly select a proposal from invalid states
-  function invalidCancel(uint256 _randomIndex) public countCall("invalidCancel") {
+  function invalidCancel(uint256 _randomIndex) external countCall("invalidCancel") {
     // Get a random proposal from invalid states for cancellation
     IGovernor.ProposalState[] memory _invalidStates = new IGovernor.ProposalState[](4);
     _invalidStates[0] = IGovernor.ProposalState.Pending;
@@ -346,7 +311,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   /// @notice Attempt to queue a proposal with an invalid caller (should revert)
   /// @param _randomIndex Used to randomly select a valid proposal
   /// @param _caller Random caller address
-  function invalidCallerOnQueue(uint256 _randomIndex, address _caller) public countCall("invalidCallerOnQueue") {
+  function invalidCallerOnQueue(uint256 _randomIndex, address _caller) external countCall("invalidCallerOnQueue") {
     // Assume caller is not the guardian
     vm.assume(_caller != guardian);
 
@@ -374,7 +339,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   /// @notice Attempt to execute a proposal with an invalid caller (should revert)
   /// @param _randomIndex Used to randomly select a valid proposal
   /// @param _caller Random caller address
-  function invalidCallerOnExecute(uint256 _randomIndex, address _caller) public countCall("invalidCallerOnExecute") {
+  function invalidCallerOnExecute(uint256 _randomIndex, address _caller) external countCall("invalidCallerOnExecute") {
     // Assume caller is not the guardian
     vm.assume(_caller != guardian);
 
@@ -402,7 +367,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   /// @notice Attempt to cancel a proposal with an invalid caller (should revert)
   /// @param _randomIndex Used to randomly select a valid proposal
   /// @param _caller Random caller address
-  function invalidCallerOnCancel(uint256 _randomIndex, address _caller) public countCall("invalidCallerOnCancel") {
+  function invalidCallerOnCancel(uint256 _randomIndex, address _caller) external countCall("invalidCallerOnCancel") {
     // Assume caller is not the guardian
     vm.assume(_caller != guardian);
 
@@ -445,21 +410,16 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     console.log("ghost_rollbackExistsReverts", ghost_rollbackExistsReverts);
     console.log("ghost_invalidOperationReverts", ghost_invalidOperationReverts);
     console.log("ghost_authorizationReverts", ghost_authorizationReverts);
-    console.log("ghost_contractReverts", ghost_contractReverts);
-    console.log("ghost_randByStateReverts", ghost_randByStateReverts);
-    console.log("ghost_randByStatesReverts", ghost_randByStatesReverts);
-
-    // Calculate total expected reverts
-    uint256 totalExpectedReverts = ghost_rollbackExistsReverts + ghost_invalidOperationReverts
-      + ghost_authorizationReverts + ghost_randByStateReverts + ghost_randByStatesReverts;
     console.log("-------------------");
-    console.log("TOTAL EXPECTED REVERTS:", totalExpectedReverts);
+    console.log(
+      "TOTAL EXPECTED REVERTS:",
+      ghost_rollbackExistsReverts + ghost_invalidOperationReverts + ghost_authorizationReverts
+    );
     console.log("(includes: duplicate rollbacks, invalid operations, auth failures, random selection errors)");
-    console.log("UNEXPECTED REVERTS:", ghost_contractReverts);
     console.log("-------------------");
   }
 
-  function forEachRollback(function(RollbackProposal memory) external _func) public {
+  function forEachRollback(function(RollbackProposal memory) external _func) external {
     _rollbackSet.forEach(_func);
   }
 
@@ -469,16 +429,15 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     _rollbackSet.forEachByState(_state, _func);
   }
 
-  function forEachRollbackQueuedButNotExecutable(function(RollbackProposal memory) external _func) public {
+  function forEachRollbackQueuedButNotExecutable(function(RollbackProposal memory) external _func) external {
     _rollbackSet.forEachQueuedButNotExecutable(_func);
   }
 
-  function getRollbackSetCount() public view returns (uint256) {
+  function getRollbackSetCount() external view returns (uint256) {
     return _rollbackSet.count();
   }
 
-  function getRollbackProposal(uint256 _index) public view returns (RollbackProposal memory) {
-    require(_index < _rollbackSet.proposals.length, "Index out of bounds");
+  function getRollbackProposal(uint256 _index) external view returns (RollbackProposal memory) {
     return _rollbackSet.proposals[_index];
   }
 }

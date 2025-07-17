@@ -272,10 +272,9 @@ library LibRollbackSet {
     }
   }
 
-  function forEachQueuedButNotExecutable(
-    RollbackSet storage _s,
-    function(RollbackProposal memory) external _func
-  ) internal {
+  function forEachQueuedButNotExecutable(RollbackSet storage _s, function(RollbackProposal memory) external _func)
+    internal
+  {
     RollbackProposal[] memory _queued = getByState(_s, IGovernor.ProposalState.Queued);
     for (uint256 i = 0; i < _queued.length; i++) {
       if (!URMCore(_s.urm).isRollbackExecutable(_queued[i].rollbackId)) {

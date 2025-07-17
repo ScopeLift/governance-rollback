@@ -1,5 +1,6 @@
 [profile.default]
   evm_version = "cancun"
+  fail_on_revert = true
   fs_permissions = [
     { access = "read", path = "./script/helpers/CompoundProposalDescription.md" },
   ]
@@ -38,3 +39,6 @@
 
 [profile.docs]
   src = 'src/interfaces/'
+
+[invariant]
+  fail_on_revert = true
