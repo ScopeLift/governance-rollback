@@ -3,7 +3,7 @@
 
 pragma solidity 0.8.30;
 
-contract DeployInput {
+contract URMCompoundDeployInput {
   // Compound DAO Timelock contract
   address payable public constant COMPOUND_TIMELOCK = payable(0x6d903f6003cca6255D85CcA4D3B5E5146dC33925);
   // Compound Governor contract
@@ -23,6 +23,6 @@ contract DeployInput {
   // Deployed TimelockMultiAdminShim contract
   address public TIMELOCK_MULTI_ADMIN_SHIM = address(0);
 
-  // Deployed UpgradeRegressionManager contract
-  address public UPGRADE_REGRESSION_MANAGER = address(0);
+  // Deployed URMCompoundManager contract
+  address public URM_COMPOUND_MANAGER = address(0);
 }
