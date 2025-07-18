@@ -81,4 +81,9 @@ contract MockCompoundTargetTimelock is ICompoundTimelockTarget {
   function lastParam__cancelTransactions__() external view returns (TimelockTransactionCall[] memory) {
     return _lastParam__cancelTransactions__;
   }
+
+  // Helper function to set the delay
+  function setDelay(uint256 _delay) external {
+    delay = _delay;
+  }
 }

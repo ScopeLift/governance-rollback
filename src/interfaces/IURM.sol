@@ -72,6 +72,10 @@ interface IURM {
 
   function setAdmin(address _newAdmin) external;
 
+  function state(uint256 _rollbackId) external view returns (IGovernor.ProposalState);
+
+  function isRollbackExecutable(uint256 _rollbackId) external view returns (bool);
+
   /*///////////////////////////////////////////////////////////////
                      Public Functions 
   //////////////////////////////////////////////////////////////*/
@@ -82,6 +86,4 @@ interface IURM {
     bytes[] memory _calldatas,
     string memory _description
   ) external view returns (uint256 _rollbackId);
-
-  function state(uint256 _rollbackId) external view returns (IGovernor.ProposalState);
 }
