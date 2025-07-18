@@ -418,18 +418,14 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     console.log("invalidCallerOnQueue", calls["invalidCallerOnQueue"]);
     console.log("invalidCallerOnExecute", calls["invalidCallerOnExecute"]);
     console.log("invalidCallerOnCancel", calls["invalidCallerOnCancel"]);
-    console.log("----------GHOST VARIABLES---------");
     console.log("ghost_unableToFindProposals", ghost_unableToFindProposals);
     console.log("ghost_rollbackExistsReverts", ghost_rollbackExistsReverts);
     console.log("ghost_invalidOperationReverts", ghost_invalidOperationReverts);
     console.log("ghost_authorizationReverts", ghost_authorizationReverts);
-    console.log("-------------------");
     console.log(
       "TOTAL EXPECTED REVERTS:",
       ghost_rollbackExistsReverts + ghost_invalidOperationReverts + ghost_authorizationReverts
     );
-    console.log("(includes: duplicate rollbacks, invalid operations, auth failures, random selection errors)");
-    console.log("-------------------");
   }
 
   function forEachRollback(function(RollbackProposal memory) external _func) external {
