@@ -35,6 +35,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   uint256 public ghost_rollbackExistsReverts;
   uint256 public ghost_invalidOperationReverts;
   uint256 public ghost_authorizationReverts;
+  uint256 public ghost_unableToFindProposals;
 
   modifier countCall(bytes32 key) {
     calls[key]++;
@@ -92,6 +93,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   function queue(uint256 _randomIndex) external countCall("queue") {
     // Only proceed if there are pending proposals
     if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Pending)) {
+      ghost_unableToFindProposals++;
       return;
     }
 
@@ -112,6 +114,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   function wrapBeforeExpiryAndQueue(uint256 _randomIndex) external countCall("wrapBeforeExpiryAndQueue") {
     // Only proceed if there are expired proposals
     if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Expired)) {
+      ghost_unableToFindProposals++;
       return;
     }
 
@@ -138,6 +141,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   function execute(uint256 _randomIndex) external countCall("execute") {
     // Only proceed if there are executable proposals
     if (!_rollbackSet.hasExecutableProposals()) {
+      ghost_unableToFindProposals++;
       return;
     }
 
@@ -158,6 +162,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   function warpAndExecute(uint256 _randomIndex) external countCall("warpAndExecute") {
     // Only proceed if there are queued proposals
     if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Queued)) {
+      ghost_unableToFindProposals++;
       return;
     }
 
@@ -184,6 +189,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
   function cancel(uint256 _randomIndex) external countCall("cancel") {
     // Only proceed if there are queued proposals
     if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Queued)) {
+      ghost_unableToFindProposals++;
       return;
     }
 
@@ -213,6 +219,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
 
     // Only proceed if there are proposals in invalid states
     if (!_rollbackSet.hasProposalsInStates(_invalidStates)) {
+      ghost_unableToFindProposals++;
       return;
     }
 
@@ -247,6 +254,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     bool _hasNonExecutableQueued = _rollbackSet.hasQueuedProposalsWhichAreNotExecutable();
 
     if (!_hasInvalidProposals && !_hasNonExecutableQueued) {
+      ghost_unableToFindProposals++;
       return;
     }
 
@@ -290,6 +298,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
 
     // Only proceed if there are proposals in invalid states
     if (!_rollbackSet.hasProposalsInStates(_invalidStates)) {
+      ghost_unableToFindProposals++;
       return;
     }
 
@@ -317,6 +326,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
 
     // Only proceed if there are pending proposals
     if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Pending)) {
+      ghost_unableToFindProposals++;
       return;
     }
 
@@ -345,6 +355,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
 
     // Only proceed if there are executable proposals
     if (!_rollbackSet.hasExecutableProposals()) {
+      ghost_unableToFindProposals++;
       return;
     }
 
@@ -373,6 +384,7 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
 
     // Only proceed if there are queued proposals
     if (!_rollbackSet.hasProposalsInState(IGovernor.ProposalState.Queued)) {
+      ghost_unableToFindProposals++;
       return;
     }
 
@@ -406,7 +418,8 @@ contract URMCompoundManagerHandler is CommonBase, StdCheats, StdUtils {
     console.log("invalidCallerOnQueue", calls["invalidCallerOnQueue"]);
     console.log("invalidCallerOnExecute", calls["invalidCallerOnExecute"]);
     console.log("invalidCallerOnCancel", calls["invalidCallerOnCancel"]);
-    console.log("-------------------");
+    console.log("----------GHOST VARIABLES---------");
+    console.log("ghost_unableToFindProposals", ghost_unableToFindProposals);
     console.log("ghost_rollbackExistsReverts", ghost_rollbackExistsReverts);
     console.log("ghost_invalidOperationReverts", ghost_invalidOperationReverts);
     console.log("ghost_authorizationReverts", ghost_authorizationReverts);

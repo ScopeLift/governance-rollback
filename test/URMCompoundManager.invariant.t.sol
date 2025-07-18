@@ -43,6 +43,7 @@ contract URMCompoundManagerInvariantTest is Test {
     excludeSelectors[0] = URMCompoundManagerHandler.forEachRollbackQueuedButNotExecutable.selector;
     excludeSelectors[1] = URMCompoundManagerHandler.forEachRollbackByState.selector;
     excludeSelectors[2] = URMCompoundManagerHandler.forEachRollback.selector;
+
     excludeSelector(FuzzSelector(address(handler), excludeSelectors));
   }
 
