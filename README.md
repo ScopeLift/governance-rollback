@@ -8,12 +8,12 @@ The Governance Emergency Rollback system provides emergency rollback capabilitie
 
 The system supports two different governance flavors:
 
-- **[Compound Governance](docs/COMPOUND_URM.md)** - For DAOs using legacy Compound-style governance with single-executor timelocks
-- **[OpenZeppelin Governance](docs/OZ_URM.md)** - For DAOs using OpenZeppelin Governor with multi-executor timelocks
+- **[Compound Governance](docs/ROLLBACK_MANAGER_TIMELOCK_COMPOUND.md)** - For DAOs using legacy Compound-style governance with single-executor timelocks
+- **[OpenZeppelin Governance](docs/ROLLBACK_MANAGER_TIMELOCK_CONTROL.md)** - For DAOs using OpenZeppelin Governor with multi-executor timelocks
 
-## Universal Rollback Manager (URM)
+## Rollback Manager
 
-The **Universal Rollback Manager (URM)** is the core contract that manages the lifecycle of rollback proposals, ensuring their proper execution and oversight across different governance systems.
+The **Rollback Manager** is the core contract that manages the lifecycle of rollback proposals, ensuring their proper execution and oversight across different governance systems.
 
 ### Key Features
 
@@ -65,7 +65,7 @@ stateDiagram-v2
 
 ### Proposal Creation with Rollback
 
-When creating a governance proposal, proposers include rollback transactions using a double-encoding mechanism. The rollback transactions are encoded as parameters to the URM's propose() function, which is then included as a transaction in the governance proposal.
+When creating a governance proposal, proposers include rollback transactions using a double-encoding mechanism. The rollback transactions are encoded as parameters to the Rollback Manager's propose() function, which is then included as a transaction in the governance proposal.
 
 **Example: Fee Management Proposal with Rollback**
 
@@ -78,8 +78,8 @@ uint256[] memory rollbackValues = [0];
 bytes[] memory rollbackCalldatas = [abi.encodeWithSignature("setFeeLevel(uint256)", 0)];
 string memory rollbackDescription = "Emergency rollback: Reset fee level to 0";
 
-// 2. Double-encode the rollback data as parameters to URM.propose()
-bytes memory urmProposeCalldata = abi.encodeWithSignature(
+// 2. Double-encode the rollback data as parameters to RollbackManager.propose()
+bytes memory rollbackManagerProposeCalldata = abi.encodeWithSignature(
     "propose(address[],uint256[],bytes[],string)",
     rollbackTargets,
     rollbackValues,
@@ -87,12 +87,12 @@ bytes memory urmProposeCalldata = abi.encodeWithSignature(
     rollbackDescription
 );
 
-// 3. Include both the main proposal and URM.propose() call in the governance proposal
-address[] memory proposalTargets = [feeManagerContract, address(urm)];
+// 3. Include both the main proposal and RollbackManager.propose() call in the governance proposal
+address[] memory proposalTargets = [feeManagerContract, address(rollbackManager)];
 uint256[] memory proposalValues = [0, 0];
 bytes[] memory proposalCalldatas = [
     abi.encodeWithSignature("setFeeLevel(uint256)", 50),  // Main proposal: set fee to 50
-    urmProposeCalldata                                     // Rollback proposal: reset fee to 0
+    rollbackManagerProposeCalldata                         // Rollback proposal: reset fee to 0
 ];
 string memory proposalDescription = "Set fee level to 50 with emergency rollback capability";
 ```
@@ -101,14 +101,14 @@ string memory proposalDescription = "Set fee level to 50 with emergency rollback
 
 The double-encoding mechanism is used to package rollback transactions inside a governance proposal:
 
-1. **First Encoding**: The actual rollback transactions — including target addresses, values, and calldata — are encoded as inputs to the propose() function of the Universal Rollback Manager (URM).
-2. **Second Encoding**: The URM propose() call itself is then encoded as a transaction within the broader governance proposal submitted to the Governor.
+1. **First Encoding**: The actual rollback transactions — including target addresses, values, and calldata — are encoded as inputs to the propose() function of the Rollback Manager.
+2. **Second Encoding**: The RollbackManager propose() call itself is then encoded as a transaction within the broader governance proposal submitted to the Governor.
 
 This approach ensures that if a rollback needs to be queued or executed, it follows the same lifecycle and governance protections as a regular proposal once it's in the queue.
 
 ### Emergency Execution
 
-If an emergency rollback is required after a proposal has already been executed, the guardian initiates the rollback process by queuing the corresponding transactions through the Universal Rollback Manager (URM). This action schedules the rollback for execution.
+If an emergency rollback is required after a proposal has already been executed, the guardian initiates the rollback process by queuing the corresponding transactions through the Rollback Manager. This action schedules the rollback for execution.
 
 Once the configured timelock delay has passed, the guardian can then execute the rollback. This effectively reverses the changes introduced by the original proposal, mitigating any negative impact it may have caused.
 
@@ -116,24 +116,24 @@ Once the configured timelock delay has passed, the guardian can then execute the
 
 ### Compound Governance
 
-For DAOs using legacy Compound-style governance systems, the URM integrates with a **TimelockMultiAdminShim** to enable multiple executors on single-executor timelocks.
+For DAOs using legacy Compound-style governance systems, the Rollback Manager integrates with a **TimelockMultiAdminShim** to enable multiple executors on single-executor timelocks.
 
-**[View Compound Implementation Details](docs/COMPOUND_URM.md)**
+**[View Compound Implementation Details](docs/ROLLBACK_MANAGER_TIMELOCK_COMPOUND.md)**
 
 ### OpenZeppelin Governance
 
-For DAOs using OpenZeppelin Governor systems, the URM integrates directly with the existing multi-executor timelock infrastructure.
+For DAOs using OpenZeppelin Governor systems, the Rollback Manager integrates directly with the existing multi-executor timelock infrastructure.
 
-**[View OpenZeppelin Implementation Details](docs/OZ_URM.md)**
+**[View OpenZeppelin Implementation Details](docs/ROLLBACK_MANAGER_TIMELOCK_CONTROL.md)**
 
 ## System Components
 
-### Universal Rollback Manager (URM)
+### Rollback Manager
 
-* [URM Interface](src/interfaces/IURM.sol)
-* [URM Core Implementation](src/contracts/URMCore.sol)
-* [Compound Manager](src/contracts/urm/URMCompoundManager.sol)
-* [OpenZeppelin Manager](src/contracts/urm/URMOZManager.sol)
+* [Rollback Manager Interface](src/interfaces/IRollbackManager.sol)
+* [Rollback Manager Core Implementation](src/RollbackManager.sol)
+* [Compound Manager](src/RollbackManagerTimelockCompound.sol)
+* [OpenZeppelin Manager](src/RollbackManagerTimelockControl.sol)
 
 The core contract that manages the lifecycle of rollback proposals across different governance systems.
 

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.30;
 
 // Contract Imports
-import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
+import {TimelockMultiAdminShim} from "src/TimelockMultiAdminShim.sol";
 
 // Test Imports
 import {Test} from "forge-std/Test.sol";

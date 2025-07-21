@@ -2,7 +2,7 @@
 pragma solidity ^0.8.30;
 
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
-import {URMCore} from "../../src/contracts/URMCore.sol";
+import {RollbackManager} from "../../src/RollbackManager.sol";
 
 struct RollbackProposal {
   address[] targets;
@@ -15,12 +15,12 @@ struct RollbackProposal {
 struct RollbackSet {
   RollbackProposal[] proposals;
   mapping(uint256 => bool) saved; // rollbackId => exists
-  address urm; // URM contract address for state queries
+  address rollbackManager; // Rollback Manager contract address for state queries
 }
 
 library LibRollbackSet {
-  function setURM(RollbackSet storage _s, address _urm) internal {
-    _s.urm = _urm;
+  function setRollbackManager(RollbackSet storage _s, address _rollbackManager) internal {
+    _s.rollbackManager = _rollbackManager;
   }
 
   function add(RollbackSet storage _s, RollbackProposal memory _proposal) internal {
@@ -41,7 +41,7 @@ library LibRollbackSet {
   function countByState(RollbackSet storage _s, IGovernor.ProposalState _state) internal view returns (uint256) {
     uint256 _count = 0;
     for (uint256 _i = 0; _i < _s.proposals.length; _i++) {
-      if (URMCore(_s.urm).state(_s.proposals[_i].rollbackId) == _state) {
+      if (RollbackManager(_s.rollbackManager).state(_s.proposals[_i].rollbackId) == _state) {
         _count++;
       }
     }
@@ -54,7 +54,7 @@ library LibRollbackSet {
     uint256 _count = 0;
 
     for (uint256 _i = 0; _i < _queuedProposals.length; _i++) {
-      if (URMCore(_s.urm).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
+      if (RollbackManager(_s.rollbackManager).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
         _count++;
       }
     }
@@ -68,7 +68,7 @@ library LibRollbackSet {
     uint256 _count = 0;
 
     for (uint256 _i = 0; _i < _queuedProposals.length; _i++) {
-      if (!URMCore(_s.urm).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
+      if (!RollbackManager(_s.rollbackManager).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
         _count++;
       }
     }
@@ -84,7 +84,7 @@ library LibRollbackSet {
     // Count matching proposals first
     uint256 _count = 0;
     for (uint256 _i = 0; _i < _s.proposals.length; _i++) {
-      if (URMCore(_s.urm).state(_s.proposals[_i].rollbackId) == _state) {
+      if (RollbackManager(_s.rollbackManager).state(_s.proposals[_i].rollbackId) == _state) {
         _count++;
       }
     }
@@ -93,7 +93,7 @@ library LibRollbackSet {
     RollbackProposal[] memory _result = new RollbackProposal[](_count);
     uint256 _index = 0;
     for (uint256 _i = 0; _i < _s.proposals.length; _i++) {
-      if (URMCore(_s.urm).state(_s.proposals[_i].rollbackId) == _state) {
+      if (RollbackManager(_s.rollbackManager).state(_s.proposals[_i].rollbackId) == _state) {
         _result[_index] = _s.proposals[_i];
         _index++;
       }
@@ -137,7 +137,7 @@ library LibRollbackSet {
     // Count how many are not executable
     uint256 _count = 0;
     for (uint256 _i = 0; _i < _queuedProposals.length; _i++) {
-      if (!URMCore(_s.urm).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
+      if (!RollbackManager(_s.rollbackManager).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
         _count++;
       }
     }
@@ -152,7 +152,7 @@ library LibRollbackSet {
 
     // Populate the array with non-executable proposals
     for (uint256 _i = 0; _i < _queuedProposals.length; _i++) {
-      if (!URMCore(_s.urm).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
+      if (!RollbackManager(_s.rollbackManager).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
         _nonExecutableProposals[_index] = _queuedProposals[_i];
         _index++;
       }
@@ -173,7 +173,7 @@ library LibRollbackSet {
     // Count how many are executable
     uint256 _count = 0;
     for (uint256 _i = 0; _i < _queuedProposals.length; _i++) {
-      if (URMCore(_s.urm).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
+      if (RollbackManager(_s.rollbackManager).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
         _count++;
       }
     }
@@ -188,7 +188,7 @@ library LibRollbackSet {
 
     // Populate the array with executable proposals
     for (uint256 _i = 0; _i < _queuedProposals.length; _i++) {
-      if (URMCore(_s.urm).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
+      if (RollbackManager(_s.rollbackManager).isRollbackExecutable(_queuedProposals[_i].rollbackId)) {
         _executableProposals[_index] = _queuedProposals[_i];
         _index++;
       }
@@ -208,7 +208,7 @@ library LibRollbackSet {
     uint256 _count = 0;
 
     for (uint256 _i = 0; _i < _s.proposals.length; _i++) {
-      IGovernor.ProposalState _proposalState = URMCore(_s.urm).state(_s.proposals[_i].rollbackId);
+      IGovernor.ProposalState _proposalState = RollbackManager(_s.rollbackManager).state(_s.proposals[_i].rollbackId);
 
       // Check if this proposal's state is in our target states
       for (uint256 _j = 0; _j < _states.length; _j++) {
@@ -277,7 +277,7 @@ library LibRollbackSet {
   {
     RollbackProposal[] memory _queued = getByState(_s, IGovernor.ProposalState.Queued);
     for (uint256 i = 0; i < _queued.length; i++) {
-      if (!URMCore(_s.urm).isRollbackExecutable(_queued[i].rollbackId)) {
+      if (!RollbackManager(_s.rollbackManager).isRollbackExecutable(_queued[i].rollbackId)) {
         _func(_queued[i]);
       }
     }

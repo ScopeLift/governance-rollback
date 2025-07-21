@@ -14,8 +14,8 @@ The upgrade involves:
     - `TimelockMultiAdminShim` (Shim) with  
       - `admin` = Governor
       - `timelock` = Compound Timelock
-      - `executor` = URM
-    - `URMCompoundManager` (URM) with 
+      - `executor` = Rollback Manager
+    - `RollbackManagerTimelockCompound` (Rollback Manager) with 
        - `admin` = Compound Timelock
        - `guardian` = Compound trusted multisig
        - `target` = `TimelockMultiAdminShim`

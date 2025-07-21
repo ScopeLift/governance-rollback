@@ -2,6 +2,5 @@
 @scopelift/compound-governance-upgrade/contracts/=lib/compound-governance-upgrade/contracts/
 forge-std/=lib/forge-std/src/
 
-contracts/=src/contracts
 interfaces/=src/interfaces
 @openzeppelin/contracts-upgradeable/=lib/compound-governance-upgrade/lib/openzeppelin-contracts-upgradeable/contracts/

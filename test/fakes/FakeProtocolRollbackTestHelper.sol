@@ -3,17 +3,17 @@ pragma solidity ^0.8.30;
 
 import {FakeProtocolContract} from "test/fakes/FakeProtocolContract.sol";
 import {Proposal} from "test/helpers/Proposal.sol";
-import {IURM} from "interfaces/IURM.sol";
+import {IRollbackManager} from "interfaces/IRollbackManager.sol";
 
 /// @title FakeProtocolRollbackTestHelper
 /// @notice Helper functions for testing rollback scenarios with FakeProtocolContract
 contract FakeProtocolRollbackTestHelper {
   FakeProtocolContract public fakeProtocolContract;
-  IURM public urm;
+  IRollbackManager public rollbackManager;
 
-  constructor(FakeProtocolContract _fakeProtocolContract, IURM _urm) {
+  constructor(FakeProtocolContract _fakeProtocolContract, IRollbackManager _rollbackManager) {
     fakeProtocolContract = _fakeProtocolContract;
-    urm = _urm;
+    rollbackManager = _rollbackManager;
   }
 
   /// @notice Generates rollback data for changing the fee and feeGuardian of FakeProtocolContract
@@ -53,16 +53,16 @@ contract FakeProtocolRollbackTestHelper {
   function getRollbackId(uint256 _rollbackFee, address _rollbackFeeGuardian) public view returns (uint256) {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas, string memory _description) =
       generateRollbackData(_rollbackFee, _rollbackFeeGuardian);
-    return urm.getRollbackId(_targets, _values, _calldatas, _description);
+    return rollbackManager.getRollbackId(_targets, _values, _calldatas, _description);
   }
 
-  /// @notice Generates double-encoded URM propose data for rollback
+  /// @notice Generates double-encoded Rollback Manager propose data for rollback
   /// @param _rollbackFee The rollback fee to set in rollback
   /// @param _rollbackFeeGuardian The rollback fee guardian to set in rollback
-  /// @return _target The target address (URM)
+  /// @return _target The target address (Rollback Manager)
   /// @return _value The ETH value to send
-  /// @return _calldata The encoded URM.propose call
-  function generateURMProposeData(uint256 _rollbackFee, address _rollbackFeeGuardian)
+  /// @return _calldata The encoded Rollback Manager.propose call
+  function generateRollbackManagerProposeData(uint256 _rollbackFee, address _rollbackFeeGuardian)
     public
     view
     returns (address _target, uint256 _value, bytes memory _calldata)
@@ -75,14 +75,15 @@ contract FakeProtocolRollbackTestHelper {
       string memory _description
     ) = generateRollbackData(_rollbackFee, _rollbackFeeGuardian);
 
-    // Create the URM.propose() calldata
-    bytes memory _urmProposeCalldata =
-      abi.encodeWithSelector(IURM.propose.selector, _rollbackTargets, _rollbackValues, _rollbackCalldatas, _description);
+    // Create the Rollback Manager.propose() calldata
+    bytes memory _rollbackManagerProposeCalldata = abi.encodeWithSelector(
+      IRollbackManager.propose.selector, _rollbackTargets, _rollbackValues, _rollbackCalldatas, _description
+    );
 
     // Create governance proposal data
-    _target = address(urm);
+    _target = address(rollbackManager);
     _value = 0;
-    _calldata = _urmProposeCalldata;
+    _calldata = _rollbackManagerProposeCalldata;
 
     return (_target, _value, _calldata);
   }
@@ -133,7 +134,7 @@ contract FakeProtocolRollbackTestHelper {
 
     // Third transaction: rollback
     (address _rollbackTarget, uint256 _rollbackValue, bytes memory _rollbackCalldata) =
-      generateURMProposeData(_rollbackFee, _rollbackFeeGuardian);
+      generateRollbackManagerProposeData(_rollbackFee, _rollbackFeeGuardian);
 
     _targets[2] = _rollbackTarget;
     _values[2] = _rollbackValue;

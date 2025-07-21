@@ -9,8 +9,8 @@ import {Script} from "forge-std/Script.sol";
 
 // Internal imports
 import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompoundTimelock.sol";
-import {TimelockMultiAdminShim} from "src/contracts/TimelockMultiAdminShim.sol";
-import {URMCompoundDeployInput} from "script/URMCompoundDeployInput.sol";
+import {TimelockMultiAdminShim} from "src/TimelockMultiAdminShim.sol";
+import {RollbackManagerTimelockCompoundDeployInput} from "script/RollbackManagerTimelockCompoundDeployInput.sol";
 import {BaseLogger} from "script/BaseLogger.sol";
 
 // Simple interface for the updateTimelock method
@@ -22,7 +22,7 @@ interface Timelock {
 /// @notice Script to propose transferring timelock admin to TimelockMultiAdminShim
 /// @dev This script creates a governance proposal to transfer the timelock admin
 ///      from the current governor to the TimelockMultiAdminShim contract
-contract ProposeTransferOwnershipToShim is Script, BaseLogger, URMCompoundDeployInput {
+contract ProposeTransferOwnershipToShim is Script, BaseLogger, RollbackManagerTimelockCompoundDeployInput {
   function run() public returns (uint256) {
     vm.startBroadcast();
     (address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description) =
