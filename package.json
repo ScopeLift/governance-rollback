@@ -5,10 +5,10 @@
   "main": "index.js",
   "scripts": {
     "prepare": "husky",
-    "test": "forge test",
+    "test": "FOUNDRY_PROFILE=lite forge test",
     "test:unit": "forge test --match-path '*.unit.t.sol' -vvv",
     "test:integration": "forge test --match-path '*.integration.t.sol' -vvv",
-    "test:invariant": "forge test --match-path '*.invariant.t.sol' -vvv"
+    "test:invariant": "FOUNDRY_PROFILE=lite forge test --match-path '*.invariant.t.sol' -vvv"
   },
   "keywords": [],
   "author": "ScopeLift",

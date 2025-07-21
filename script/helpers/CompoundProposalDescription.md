@@ -34,7 +34,7 @@ The `TimelockMultiAdminShim` acts as a proxy layer that:
 
 1. `CompoundTimelock` accepts `TimelockMultiAdminShim` as the new admin (pending → accepted)
 2. `CompoundGovernor` begins using the shim for all future proposal scheduling
-3. Additional executors (like `URMCompoundManager`) can be added via future proposals
+3. Additional executors (like `RollbackManagerTimelockCompound`) can be added via future proposals
 
 ---
 
