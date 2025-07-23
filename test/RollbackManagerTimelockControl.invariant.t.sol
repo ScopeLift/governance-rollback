@@ -11,8 +11,6 @@ import {MockTimelockTargetControl} from "test/mocks/MockTimelockTargetControl.so
 import {FakeProtocolContract} from "test/fakes/FakeProtocolContract.sol";
 import {RollbackManagerTimelockControlHandler} from "test/handlers/RollbackManagerTimelockControl.handler.sol";
 import {RollbackManagerInvariantTestBase} from "test/helpers/RollbackManagerInvariantTestBase.sol";
-import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
-import {RollbackProposal} from "test/helpers/RollbackSet.sol";
 import {RollbackManagerHandlerBase} from "test/helpers/RollbackManagerHandlerBase.sol";
 
 contract RollbackManagerTimelockControlInvariantTest is RollbackManagerInvariantTestBase {
@@ -20,7 +18,7 @@ contract RollbackManagerTimelockControlInvariantTest is RollbackManagerInvariant
   MockTimelockTargetControl public timelockTarget;
   RollbackManagerHandlerBase public handler;
 
-  function setUp() public override {
+  function _setupHandler() internal override {
     timelockTarget = new MockTimelockTargetControl();
     timelockTarget.setMinDelay(delay);
 
@@ -32,20 +30,6 @@ contract RollbackManagerTimelockControlInvariantTest is RollbackManagerInvariant
     rollbackManager = new RollbackManagerTimelockControl(address(timelockTarget), admin, guardian, delay, delay);
 
     handler = new RollbackManagerTimelockControlHandler(rollbackManager, admin, guardian, rollbackProposalTargets);
-
-    // target the handler for invariant testing
-    targetContract(address(handler));
-
-    // Exclude handler iteration functions from fuzzing
-    bytes4[] memory excludeSelectors = new bytes4[](6);
-    excludeSelectors[0] = RollbackManagerHandlerBase.forEachRollbackQueuedButNotExecutable.selector;
-    excludeSelectors[1] = RollbackManagerHandlerBase.forEachRollbackByState.selector;
-    excludeSelectors[2] = RollbackManagerHandlerBase.forEachRollback.selector;
-    excludeSelectors[3] = RollbackManagerHandlerBase.getRollbackSetCount.selector;
-    excludeSelectors[4] = RollbackManagerHandlerBase.getRollbackProposal.selector;
-    excludeSelectors[5] = RollbackManagerHandlerBase.callSummary.selector;
-
-    excludeSelector(FuzzSelector(address(handler), excludeSelectors));
   }
 
   function _getRollbackManager() internal view override returns (RollbackManager) {

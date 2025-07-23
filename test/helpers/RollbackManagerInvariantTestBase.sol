@@ -37,7 +37,30 @@ abstract contract RollbackManagerInvariantTestBase is Test {
   function _getHandler() internal view virtual returns (RollbackManagerHandlerBase);
 
   /// @notice Abstract setUp method to be implemented by subclasses
-  function setUp() public virtual;
+  function setUp() public virtual {
+    _setupHandler();
+    _setupFuzzerConfiguration();
+  }
+
+  /// @notice Abstract method to setup the handler (to be implemented by subclasses)
+  function _setupHandler() internal virtual;
+
+  /// @notice Setup fuzzer targeting and selector exclusions for invariant testing
+  function _setupFuzzerConfiguration() internal {
+    // target the handler for invariant testing
+    targetContract(address(_getHandler()));
+
+    // Exclude handler iteration functions from fuzzing
+    bytes4[] memory excludeSelectors = new bytes4[](6);
+    excludeSelectors[0] = RollbackManagerHandlerBase.forEachRollbackQueuedButNotExecutable.selector;
+    excludeSelectors[1] = RollbackManagerHandlerBase.forEachRollbackByState.selector;
+    excludeSelectors[2] = RollbackManagerHandlerBase.forEachRollback.selector;
+    excludeSelectors[3] = RollbackManagerHandlerBase.getRollbackSetCount.selector;
+    excludeSelectors[4] = RollbackManagerHandlerBase.getRollbackProposal.selector;
+    excludeSelectors[5] = RollbackManagerHandlerBase.callSummary.selector;
+
+    excludeSelector(FuzzSelector(address(_getHandler()), excludeSelectors));
+  }
 
   // Expired proposals are not executable
   function invariant_expiredRollbackIsNotExecutable() public {
