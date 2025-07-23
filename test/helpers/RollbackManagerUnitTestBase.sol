@@ -4,7 +4,6 @@ pragma solidity ^0.8.30;
 // Contract Imports
 import {RollbackManager, Rollback, IGovernor} from "src/RollbackManager.sol";
 import {RollbackManagerTimelockControl} from "src/RollbackManagerTimelockControl.sol";
-import {MockTimelockTargetControl} from "test/mocks/MockTimelockTargetControl.sol";
 
 // Test Imports
 import {Test} from "forge-std/Test.sol";

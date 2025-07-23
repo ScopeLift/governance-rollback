@@ -4,8 +4,6 @@ pragma solidity ^0.8.30;
 // Contract Imports
 import {RollbackManagerTimelockControl} from "src/RollbackManagerTimelockControl.sol";
 import {RollbackManager} from "src/RollbackManager.sol";
-import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
-import {Rollback} from "src/interfaces/IRollbackManager.sol";
 
 // Test Imports
 import {Test} from "forge-std/Test.sol";
