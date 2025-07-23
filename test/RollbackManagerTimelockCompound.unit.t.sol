@@ -1318,33 +1318,17 @@ contract IsRollbackExecutable is RollbackManagerTimelockCompoundTest {
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
-    string memory _description
+    string memory _description,
+    uint256 _delayAfterQueuing
   ) external {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
 
     uint256 _rollbackId = _queueRollback(_targets, _values, _calldatas, _description);
 
-    // Warp to after the delay period
-    vm.warp(block.timestamp + targetTimelock.delay() + 1);
-
-    bool _isExecutable = rollbackManager.isRollbackExecutable(_rollbackId);
-    assertTrue(_isExecutable);
-  }
-
-  function testFuzz_ReturnsTrueForQueuedRollbackAtExactDelay(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-
-    uint256 _rollbackId = _queueRollback(_targets, _values, _calldatas, _description);
-
-    // Warp to exactly the delay period
-    vm.warp(block.timestamp + targetTimelock.delay());
+    // Bound the delay to be at least the timelock delay
+    _delayAfterQueuing = bound(_delayAfterQueuing, targetTimelock.delay(), 365 days * 100);
+    vm.warp(block.timestamp + _delayAfterQueuing);
 
     bool _isExecutable = rollbackManager.isRollbackExecutable(_rollbackId);
     assertTrue(_isExecutable);
