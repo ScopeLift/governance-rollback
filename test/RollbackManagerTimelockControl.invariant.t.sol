@@ -18,7 +18,7 @@ import {RollbackManagerHandlerBase} from "test/helpers/RollbackManagerHandlerBas
 contract RollbackManagerTimelockControlInvariantTest is RollbackManagerInvariantTestBase {
   RollbackManagerTimelockControl public rollbackManager;
   MockTimelockTargetControl public timelockTarget;
-  RollbackManagerTimelockControlHandler public handler;
+  RollbackManagerHandlerBase public handler;
 
   function setUp() public override {
     timelockTarget = new MockTimelockTargetControl();
@@ -52,26 +52,7 @@ contract RollbackManagerTimelockControlInvariantTest is RollbackManagerInvariant
     return rollbackManager;
   }
 
-  function _getHandler() internal view override returns (address) {
-    return address(handler);
-  }
-
-  function _forEachRollbackByState(IGovernor.ProposalState _state, function(RollbackProposal memory) external _func)
-    internal
-    override
-  {
-    handler.forEachRollbackByState(_state, _func);
-  }
-
-  function _forEachRollbackQueuedButNotExecutable(function(RollbackProposal memory) external _func) internal override {
-    handler.forEachRollbackQueuedButNotExecutable(_func);
-  }
-
-  function _callSummary() internal override {
-    handler.callSummary();
-  }
-
-  function invariant_callSummary() public override {
-    handler.callSummary();
+  function _getHandler() internal view override returns (RollbackManagerHandlerBase) {
+    return handler;
   }
 }

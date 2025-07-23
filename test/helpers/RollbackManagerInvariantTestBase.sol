@@ -9,6 +9,7 @@ import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 import {RollbackManager} from "src/RollbackManager.sol";
 import {FakeProtocolContract} from "test/fakes/FakeProtocolContract.sol";
 import {RollbackProposal} from "test/helpers/RollbackSet.sol";
+import {RollbackManagerHandlerBase} from "test/helpers/RollbackManagerHandlerBase.sol";
 
 /// @title RollbackManagerInvariantTestBase
 /// @notice Abstract base invariant test class containing all shared invariant checks
@@ -33,7 +34,7 @@ abstract contract RollbackManagerInvariantTestBase is Test {
 
   /// @notice Abstract method to get the handler instance
   /// @return The handler instance
-  function _getHandler() internal view virtual returns (address);
+  function _getHandler() internal view virtual returns (RollbackManagerHandlerBase);
 
   /// @notice Abstract setUp method to be implemented by subclasses
   function setUp() public virtual;
@@ -174,21 +175,22 @@ abstract contract RollbackManagerInvariantTestBase is Test {
     }
   }
 
-  function invariant_callSummary() public virtual {
-    _callSummary();
-  }
-
-  /// @notice Abstract method to call forEachRollbackByState on the handler
-  /// @param _state The proposal state to filter by
-  /// @param _func The function to call for each proposal
+  // Concrete implementations of the handler methods
   function _forEachRollbackByState(IGovernor.ProposalState _state, function(RollbackProposal memory) external _func)
     internal
-    virtual;
+  {
+    _getHandler().forEachRollbackByState(_state, _func);
+  }
 
-  /// @notice Abstract method to call forEachRollbackQueuedButNotExecutable on the handler
-  /// @param _func The function to call for each proposal
-  function _forEachRollbackQueuedButNotExecutable(function(RollbackProposal memory) external _func) internal virtual;
+  function _forEachRollbackQueuedButNotExecutable(function(RollbackProposal memory) external _func) internal {
+    _getHandler().forEachRollbackQueuedButNotExecutable(_func);
+  }
 
-  /// @notice Abstract method to call callSummary on the handler
-  function _callSummary() internal virtual;
+  function _callSummary() internal {
+    _getHandler().callSummary();
+  }
+
+  function invariant_callSummary() public {
+    _getHandler().callSummary();
+  }
 }

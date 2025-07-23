@@ -70,8 +70,8 @@ abstract contract RollbackManagerHandlerBase is Test {
   /// @param _rollbackFee The new fee
   function propose(uint256 _rollbackFee) external countCall("propose") {
     // Get the rollback transactions
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      RollbackTransactionGenerator.generateRandomRollbackTransactions(_rollbackFee, guardian, rollbackProposalTargets, selectors);
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) = RollbackTransactionGenerator
+      .generateRandomRollbackTransactions(_rollbackFee, guardian, rollbackProposalTargets, selectors);
 
     // Get the rollback ID
     uint256 _rollbackId = _getRollbackManager().getRollbackId(_targets, _values, _calldatas, _getDescription());
