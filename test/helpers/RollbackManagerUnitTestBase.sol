@@ -1387,3 +1387,44 @@ abstract contract SetGuardianBase is RollbackManagerUnitTestBase {
     rollbackManager.setGuardian(address(0));
   }
 }
+
+abstract contract SetRollbackQueueableDurationBase is RollbackManagerUnitTestBase {
+  function test_SetsRollbackQueueableDuration(uint256 _newRollbackQueueableDuration) external {
+    _newRollbackQueueableDuration =
+      _boundToRealisticRollbackQueueableDuration(_newRollbackQueueableDuration, minRollbackQueueableDuration);
+
+    vm.prank(admin);
+    rollbackManager.setRollbackQueueableDuration(_newRollbackQueueableDuration);
+
+    assertEq(rollbackManager.rollbackQueueableDuration(), _newRollbackQueueableDuration);
+  }
+
+  function testFuzz_EmitsRollbackQueueableDurationSet(uint256 _newRollbackQueueableDuration) external {
+    _newRollbackQueueableDuration =
+      _boundToRealisticRollbackQueueableDuration(_newRollbackQueueableDuration, minRollbackQueueableDuration);
+
+    vm.expectEmit();
+    emit RollbackManager.RollbackQueueableDurationSet(rollbackQueueableDuration, _newRollbackQueueableDuration);
+    vm.prank(admin);
+    rollbackManager.setRollbackQueueableDuration(_newRollbackQueueableDuration);
+  }
+
+  function testFuzz_RevertIf_CallerIsNotAdmin(address _caller, uint256 _newRollbackQueueableDuration) external {
+    vm.assume(_caller != admin);
+
+    vm.expectRevert(RollbackManager.RollbackManager__Unauthorized.selector);
+    vm.prank(_caller);
+    rollbackManager.setRollbackQueueableDuration(_newRollbackQueueableDuration);
+  }
+
+  function test_RevertIf_NewRollbackQueueableDurationIsLessThanMinRollbackQueueableDuration(
+    uint256 _newRollbackQueueableDuration
+  ) external {
+    uint256 _invalidRollbackQueueableDuration =
+      bound(_newRollbackQueueableDuration, 0, minRollbackQueueableDuration - 1);
+
+    vm.expectRevert(RollbackManager.RollbackManager__InvalidRollbackQueueableDuration.selector);
+    vm.prank(admin);
+    rollbackManager.setRollbackQueueableDuration(_invalidRollbackQueueableDuration);
+  }
+}

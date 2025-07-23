@@ -167,6 +167,8 @@ contract IsRollbackExecutable is IsRollbackExecutableBase, RollbackManagerTimelo
 
 contract SetGuardian is SetGuardianBase, RollbackManagerTimelockControlTest {}
 
+contract SetRollbackQueueableDuration is SetRollbackQueueableDurationBase, RollbackManagerTimelockControlTest {}
+
 contract SetAdmin is RollbackManagerTimelockControlTest {
   function test_SetsAdmin(address _newAdmin) external {
     _assumeSafeAdmin(_newAdmin);
