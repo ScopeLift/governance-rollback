@@ -41,29 +41,7 @@ contract RollbackManagerTimelockCompoundTest is RollbackManagerUnitTestBase {
 
 contract Constructor is ConstructorBase, RollbackManagerTimelockCompoundTest {}
 
-contract GetRollback is RollbackManagerTimelockCompoundTest {
-  function testFuzz_ReturnsTheRollbackData(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-
-    _proposeRollback(_targets, _values, _calldatas, _description);
-
-    uint256 _rollbackId = rollbackManager.getRollbackId(_targets, _values, _calldatas, _description);
-    uint256 _rollbackQueueableDuration = rollbackManager.rollbackQueueableDuration();
-
-    Rollback memory _rollback = rollbackManager.getRollback(_rollbackId);
-
-    assertEq(_rollback.queueExpiresAt, block.timestamp + _rollbackQueueableDuration);
-    assertEq(_rollback.executableAt, 0);
-    assertEq(_rollback.canceled, false);
-    assertEq(_rollback.executed, false);
-  }
-}
+contract GetRollback is GetRollbackBase, RollbackManagerTimelockCompoundTest {}
 
 contract Propose is RollbackManagerTimelockCompoundTest {
   function testFuzz_AdminProposeRollbackReturnsId(

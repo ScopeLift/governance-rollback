@@ -2,7 +2,7 @@
 pragma solidity ^0.8.30;
 
 // Contract Imports
-import {RollbackManager} from "src/RollbackManager.sol";
+import {RollbackManager, Rollback} from "src/RollbackManager.sol";
 
 // Test Imports
 import {Test} from "forge-std/Test.sol";
@@ -262,5 +262,29 @@ abstract contract ConstructorBase is RollbackManagerUnitTestBase {
     );
     vm.expectRevert(RollbackManager.RollbackManager__InvalidRollbackQueueableDuration.selector);
     _deployRollbackManager(_targetTimelock, _admin, _guardian, _rollbackQueueableDuration, 0);
+  }
+}
+
+abstract contract GetRollbackBase is RollbackManagerUnitTestBase {
+  function testFuzz_ReturnsTheRollbackData(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    _proposeRollback(_targets, _values, _calldatas, _description);
+
+    uint256 _rollbackId = rollbackManager.getRollbackId(_targets, _values, _calldatas, _description);
+    uint256 _rollbackQueueableDuration = rollbackManager.rollbackQueueableDuration();
+
+    Rollback memory _rollback = rollbackManager.getRollback(_rollbackId);
+
+    assertEq(_rollback.queueExpiresAt, block.timestamp + _rollbackQueueableDuration);
+    assertEq(_rollback.executableAt, 0);
+    assertEq(_rollback.canceled, false);
+    assertEq(_rollback.executed, false);
   }
 }
