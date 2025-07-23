@@ -83,13 +83,13 @@ contract Queue is QueueBase, RollbackManagerTimelockCompoundTest {
   }
 }
 
-contract Cancel is RollbackManagerTimelockCompoundTest {
+contract Cancel is CancelBase, RollbackManagerTimelockCompoundTest {
   function testFuzz_ForwardsParametersToTargetTimelockWhenCallerIsGuardian(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
     string memory _description
-  ) external virtual {
+  ) external virtual override {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
     _queueRollback(_targets, _values, _calldatas, _description);
@@ -111,13 +111,13 @@ contract Cancel is RollbackManagerTimelockCompoundTest {
   }
 }
 
-contract Execute is RollbackManagerTimelockCompoundTest {
+contract Execute is ExecuteBase, RollbackManagerTimelockCompoundTest {
   function testFuzz_ForwardsParametersToTargetTimelockWhenCallerIsGuardian(
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
     string memory _description
-  ) external {
+  ) external override {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
     _queueRollback(_targets, _values, _calldatas, _description);
@@ -140,201 +140,6 @@ contract Execute is RollbackManagerTimelockCompoundTest {
       assertEq(_lastExecuteTransactionCalls[i].data, _calldatas[i]);
       assertEq(_lastExecuteTransactionCalls[i].eta, _eta);
     }
-  }
-
-  function testFuzz_EmitsRollbackExecuted(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-    uint256 _rollbackId = _queueRollback(_targets, _values, _calldatas, _description);
-
-    vm.expectEmit();
-    emit RollbackManager.RollbackExecuted(_rollbackId);
-
-    vm.warp(block.timestamp + targetTimelock.delay());
-    vm.prank(guardian);
-    rollbackManager.execute(_targets, _values, _calldatas, _description);
-  }
-
-  function testFuzz_RollbackStateIsCorrectlySet(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-    uint256 _rollbackId = _queueRollback(_targets, _values, _calldatas, _description);
-
-    uint256 _queueExpiresAt = rollbackManager.getRollback(_rollbackId).queueExpiresAt;
-    uint256 _executableAt = rollbackManager.getRollback(_rollbackId).executableAt;
-
-    vm.warp(_queueExpiresAt);
-    vm.prank(guardian);
-    rollbackManager.execute(_targets, _values, _calldatas, _description);
-
-    Rollback memory _rollback = rollbackManager.getRollback(_rollbackId);
-
-    assertEq(_rollback.queueExpiresAt, _queueExpiresAt);
-    assertEq(_rollback.executableAt, _executableAt);
-    assertEq(_rollback.canceled, false);
-    assertEq(_rollback.executed, true);
-  }
-
-  function testFuzz_SetsStateToExecuted(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-    uint256 _rollbackId = _queueRollback(_targets, _values, _calldatas, _description);
-
-    vm.warp(block.timestamp + targetTimelock.delay());
-    vm.prank(guardian);
-    rollbackManager.execute(_targets, _values, _calldatas, _description);
-
-    IGovernor.ProposalState _state = rollbackManager.state(_rollbackId);
-    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Executed));
-  }
-
-  function testFuzz_RevertIf_RollbackExecutionEtaHasNotPassed(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-    uint256 _rollbackId = _queueRollback(_targets, _values, _calldatas, _description);
-
-    vm.warp(block.timestamp + targetTimelock.delay() - 1);
-    vm.expectRevert(abi.encodeWithSelector(RollbackManager.RollbackManager__ExecutionTooEarly.selector, _rollbackId));
-    vm.prank(guardian);
-    rollbackManager.execute(_targets, _values, _calldatas, _description);
-  }
-
-  function testFuzz_RevertIf_RollbackWasNeverProposed(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-    uint256 _computedRollbackId = rollbackManager.getRollbackId(_targets, _values, _calldatas, _description);
-
-    vm.warp(block.timestamp + targetTimelock.delay());
-
-    vm.expectRevert(
-      abi.encodeWithSelector(RollbackManager.RollbackManager__NonExistentRollback.selector, _computedRollbackId)
-    );
-    vm.prank(guardian);
-    rollbackManager.execute(_targets, _values, _calldatas, _description);
-  }
-
-  function testFuzz_RevertIf_ExecuteCanceledRollback(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-
-    uint256 _rollbackId = _queueRollback(_targets, _values, _calldatas, _description);
-
-    // Verify the rollback is initially in queued state
-    IGovernor.ProposalState _initialState = rollbackManager.state(_rollbackId);
-    assertEq(uint8(_initialState), uint8(IGovernor.ProposalState.Queued));
-
-    // Cancel the rollback
-    vm.prank(guardian);
-    rollbackManager.cancel(_targets, _values, _calldatas, _description);
-
-    // Verify the rollback is now in canceled state
-    IGovernor.ProposalState _canceledState = rollbackManager.state(_rollbackId);
-    assertEq(uint8(_canceledState), uint8(IGovernor.ProposalState.Canceled));
-
-    // Warp to after the execution time would have been
-    vm.warp(block.timestamp + targetTimelock.delay());
-
-    // Try to execute the canceled rollback - should revert with specific error
-    vm.expectRevert(abi.encodeWithSelector(RollbackManager.RollbackManager__NotQueued.selector, _rollbackId));
-    vm.prank(guardian);
-    rollbackManager.execute(_targets, _values, _calldatas, _description);
-
-    // Verify the rollback is still in canceled state after the failed execution attempt
-    IGovernor.ProposalState _finalState = rollbackManager.state(_rollbackId);
-    assertEq(uint8(_finalState), uint8(IGovernor.ProposalState.Canceled));
-  }
-
-  function testFuzz_RevertIf_RollbackWasAlreadyExecuted(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-    uint256 _rollbackId = _queueRollback(_targets, _values, _calldatas, _description);
-
-    vm.warp(block.timestamp + targetTimelock.delay());
-    vm.prank(guardian);
-    rollbackManager.execute(_targets, _values, _calldatas, _description);
-
-    vm.expectRevert(abi.encodeWithSelector(RollbackManager.RollbackManager__NotQueued.selector, _rollbackId));
-    vm.prank(guardian);
-    rollbackManager.execute(_targets, _values, _calldatas, _description);
-  }
-
-  function testFuzz_RevertIf_CallerIsNotGuardian(
-    address _caller,
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-    vm.assume(_caller != guardian);
-
-    vm.expectRevert(RollbackManager.RollbackManager__Unauthorized.selector);
-    vm.prank(_caller);
-    rollbackManager.execute(_targets, _values, _calldatas, _description);
-  }
-
-  function testFuzz_RevertIf_MismatchedParameters(
-    address[2] memory _targetsFixed,
-    uint256[2] memory _valuesFixed,
-    bytes[2] memory _calldatasFixed,
-    string memory _description
-  ) external {
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
-
-    uint256[] memory _valuesMismatch = new uint256[](1);
-    bytes[] memory _calldatasMismatch = new bytes[](1);
-
-    _queueRollback(_targets, _values, _calldatas, _description);
-
-    vm.warp(block.timestamp + targetTimelock.delay());
-
-    vm.startPrank(guardian);
-    // target and values length mismatch
-    vm.expectRevert(RollbackManager.RollbackManager__MismatchedParameters.selector);
-    rollbackManager.execute(_targets, _valuesMismatch, _calldatas, _description);
-
-    // target and calldatas length mismatch
-    vm.expectRevert(RollbackManager.RollbackManager__MismatchedParameters.selector);
-    rollbackManager.execute(_targets, _values, _calldatasMismatch, _description);
-
-    vm.stopPrank();
   }
 }
 
