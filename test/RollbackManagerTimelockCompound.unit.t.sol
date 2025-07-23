@@ -1282,15 +1282,17 @@ contract IsRollbackExecutable is RollbackManagerTimelockCompoundTest {
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
-    string memory _description
+    string memory _description,
+    uint256 _delayAfterProposing
   ) external {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
 
     uint256 _rollbackId = _proposeRollback(_targets, _values, _calldatas, _description);
 
-    // Warp past the queue expiry time
-    vm.warp(block.timestamp + rollbackQueueableDuration + 1);
+    // Bound the delay to be at least the rollback queueable duration
+    _delayAfterProposing = bound(_delayAfterProposing, rollbackQueueableDuration, 365 days * 100);
+    vm.warp(block.timestamp + _delayAfterProposing);
 
     bool _isExecutable = rollbackManager.isRollbackExecutable(_rollbackId);
     assertFalse(_isExecutable);
