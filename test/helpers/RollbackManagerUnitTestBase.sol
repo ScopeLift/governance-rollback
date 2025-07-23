@@ -29,9 +29,8 @@ abstract contract RollbackManagerUnitTestBase is Test {
     uint256 _minRollbackQueueableDuration
   ) internal virtual returns (RollbackManager);
 
-  function setUp() public virtual {
-    // Child classes should override this method and call _deployRollbackManager with their specific mock timelock
-  }
+  function setUp() public virtual;
+  // Child classes should override this method and call _deployRollbackManager with their specific mock timelock
 
   /*///////////////////////////////////////////////////////////////
                       Common Helper Functions
@@ -116,5 +115,152 @@ abstract contract RollbackManagerUnitTestBase is Test {
       values[_i] = _fixedValues[_i];
       calldatas[_i] = _fixedCalldatas[_i];
     }
+  }
+}
+
+abstract contract ConstructorBase is RollbackManagerUnitTestBase {
+  function testFuzz_SetsInitialParameters(
+    address _targetTimelock,
+    address _admin,
+    address _guardian,
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
+  ) external {
+    (_minRollbackQueueableDuration, _rollbackQueueableDuration) = _assumeSafeInitParams(
+      _targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
+
+    RollbackManager _rollbackManager = _deployRollbackManager(
+      _targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
+
+    assertEq(address(_rollbackManager.TARGET_TIMELOCK()), _targetTimelock);
+    assertEq(_rollbackManager.MIN_ROLLBACK_QUEUEABLE_DURATION(), _minRollbackQueueableDuration);
+    assertEq(_rollbackManager.admin(), _admin);
+    assertEq(_rollbackManager.guardian(), _guardian);
+    assertEq(_rollbackManager.rollbackQueueableDuration(), _rollbackQueueableDuration);
+  }
+
+  function testFuzz_EmitsRollbackQueueableDurationSet(
+    address _targetTimelock,
+    address _admin,
+    address _guardian,
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
+  ) external {
+    (_minRollbackQueueableDuration, _rollbackQueueableDuration) = _assumeSafeInitParams(
+      _targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
+
+    vm.expectEmit();
+    emit RollbackManager.RollbackQueueableDurationSet(0, _rollbackQueueableDuration);
+    _deployRollbackManager(
+      _targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
+  }
+
+  function testFuzz_EmitsGuardianSet(
+    address _targetTimelock,
+    address _admin,
+    address _guardian,
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
+  ) external {
+    (_minRollbackQueueableDuration, _rollbackQueueableDuration) = _assumeSafeInitParams(
+      _targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
+
+    vm.expectEmit();
+    emit RollbackManager.GuardianSet(address(0), _guardian);
+    _deployRollbackManager(
+      _targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
+  }
+
+  function testFuzz_RevertIf_TargetTimelockIsZeroAddress(
+    address _admin,
+    address _guardian,
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
+  ) external {
+    _assumeSafeAdmin(_admin);
+    _assumeSafeGuardian(_guardian);
+    _minRollbackQueueableDuration = _boundToRealisticMinRollbackQueueableDuration(_minRollbackQueueableDuration);
+    _rollbackQueueableDuration =
+      _boundToRealisticRollbackQueueableDuration(_rollbackQueueableDuration, _minRollbackQueueableDuration);
+
+    vm.expectRevert(RollbackManager.RollbackManager__InvalidAddress.selector);
+    _deployRollbackManager(address(0), _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration);
+  }
+
+  function testFuzz_RevertIf_AdminIsZeroAddress(
+    address _targetTimelock,
+    address _guardian,
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
+  ) external {
+    _assumeSafeTargetTimelock(_targetTimelock);
+    _assumeSafeGuardian(_guardian);
+    _minRollbackQueueableDuration = _boundToRealisticMinRollbackQueueableDuration(_minRollbackQueueableDuration);
+    _rollbackQueueableDuration =
+      _boundToRealisticRollbackQueueableDuration(_rollbackQueueableDuration, _minRollbackQueueableDuration);
+
+    vm.expectRevert(RollbackManager.RollbackManager__InvalidAddress.selector);
+    _deployRollbackManager(
+      _targetTimelock, address(0), _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
+  }
+
+  function testFuzz_RevertIf_GuardianIsZeroAddress(
+    address _targetTimelock,
+    address _admin,
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
+  ) external {
+    _assumeSafeTargetTimelock(_targetTimelock);
+    _assumeSafeAdmin(_admin);
+    _minRollbackQueueableDuration = _boundToRealisticMinRollbackQueueableDuration(_minRollbackQueueableDuration);
+    _rollbackQueueableDuration =
+      _boundToRealisticRollbackQueueableDuration(_rollbackQueueableDuration, _minRollbackQueueableDuration);
+
+    vm.expectRevert(RollbackManager.RollbackManager__InvalidAddress.selector);
+    _deployRollbackManager(
+      _targetTimelock, _admin, address(0), _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
+  }
+
+  function testFuzz_RevertIf_DurationLessThanMin(
+    address _targetTimelock,
+    address _admin,
+    address _guardian,
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
+  ) external {
+    _assumeSafeTargetTimelock(_targetTimelock);
+    _assumeSafeAdmin(_admin);
+    _assumeSafeGuardian(_guardian);
+    _minRollbackQueueableDuration = _boundToRealisticMinRollbackQueueableDuration(_minRollbackQueueableDuration);
+
+    // The rollback queueable duration is bound to be less than the min rollback queueable duration.
+    uint256 _invalidRollbackQueueableDuration = bound(_rollbackQueueableDuration, 0, _minRollbackQueueableDuration - 1);
+
+    vm.expectRevert(RollbackManager.RollbackManager__InvalidRollbackQueueableDuration.selector);
+    _deployRollbackManager(
+      _targetTimelock, _admin, _guardian, _invalidRollbackQueueableDuration, _minRollbackQueueableDuration
+    );
+  }
+
+  function testFuzz_RevertIf_MinRollbackQueueableDurationIsZero(
+    address _targetTimelock,
+    address _admin,
+    address _guardian,
+    uint256 _rollbackQueueableDuration,
+    uint256 _minRollbackQueueableDuration
+  ) external {
+    (, _rollbackQueueableDuration) = _assumeSafeInitParams(
+      _targetTimelock, _admin, _guardian, _rollbackQueueableDuration, _minRollbackQueueableDuration
+    );
+    vm.expectRevert(RollbackManager.RollbackManager__InvalidRollbackQueueableDuration.selector);
+    _deployRollbackManager(_targetTimelock, _admin, _guardian, _rollbackQueueableDuration, 0);
   }
 }
