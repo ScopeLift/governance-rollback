@@ -1352,3 +1352,38 @@ abstract contract IsRollbackExecutableBase is RollbackManagerUnitTestBase {
     assertTrue(_isExecutable);
   }
 }
+
+abstract contract SetGuardianBase is RollbackManagerUnitTestBase {
+  function test_SetsGuardian(address _newGuardian) external {
+    _assumeSafeGuardian(_newGuardian);
+
+    vm.prank(admin);
+    rollbackManager.setGuardian(_newGuardian);
+
+    assertEq(rollbackManager.guardian(), _newGuardian);
+  }
+
+  function testFuzz_EmitsGuardianSet(address _newGuardian) external {
+    _assumeSafeGuardian(_newGuardian);
+
+    vm.expectEmit();
+    emit RollbackManager.GuardianSet(guardian, _newGuardian);
+    vm.prank(admin);
+    rollbackManager.setGuardian(_newGuardian);
+  }
+
+  function testFuzz_RevertIf_CallerIsNotAdmin(address _caller, address _newGuardian) external {
+    _assumeSafeGuardian(_newGuardian);
+    vm.assume(_caller != admin);
+
+    vm.expectRevert(RollbackManager.RollbackManager__Unauthorized.selector);
+    vm.prank(_caller);
+    rollbackManager.setGuardian(_newGuardian);
+  }
+
+  function test_RevertIf_NewGuardianIsZeroAddress() external {
+    vm.expectRevert(RollbackManager.RollbackManager__InvalidAddress.selector);
+    vm.prank(admin);
+    rollbackManager.setGuardian(address(0));
+  }
+}
