@@ -24,14 +24,14 @@ contract RollbackManagerTimelockCompoundInvariantTest is RollbackManagerInvarian
     timelockTarget = new MockCompoundTimelock();
     timelockTarget.setDelay(delay);
 
-    targets = new FakeProtocolContract[](3);
-    targets[0] = new FakeProtocolContract(address(timelockTarget));
-    targets[1] = new FakeProtocolContract(address(timelockTarget));
-    targets[2] = new FakeProtocolContract(address(timelockTarget));
+    rollbackProposalTargets = new FakeProtocolContract[](3);
+    rollbackProposalTargets[0] = new FakeProtocolContract(address(timelockTarget));
+    rollbackProposalTargets[1] = new FakeProtocolContract(address(timelockTarget));
+    rollbackProposalTargets[2] = new FakeProtocolContract(address(timelockTarget));
 
     rollbackManager = new RollbackManagerTimelockCompound(address(timelockTarget), admin, guardian, delay, delay);
 
-    handler = new RollbackManagerTimelockCompoundHandler(rollbackManager, admin, guardian, targets);
+    handler = new RollbackManagerTimelockCompoundHandler(rollbackManager, admin, guardian, rollbackProposalTargets);
 
     // target the handler for invariant testing
     targetContract(address(handler));

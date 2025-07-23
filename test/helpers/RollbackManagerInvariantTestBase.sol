@@ -25,7 +25,7 @@ abstract contract RollbackManagerInvariantTestBase is Test {
   address public admin = address(0x1);
   address public guardian = address(0x2);
   uint256 public delay = 2 days;
-  FakeProtocolContract[] public targets;
+  FakeProtocolContract[] public rollbackProposalTargets;
 
   /// @notice Abstract method to get the RollbackManager contract instance
   /// @return The RollbackManager contract instance
