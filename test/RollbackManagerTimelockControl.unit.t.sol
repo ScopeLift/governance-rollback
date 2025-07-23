@@ -169,40 +169,7 @@ contract SetGuardian is SetGuardianBase, RollbackManagerTimelockControlTest {}
 
 contract SetRollbackQueueableDuration is SetRollbackQueueableDurationBase, RollbackManagerTimelockControlTest {}
 
-contract SetAdmin is RollbackManagerTimelockControlTest {
-  function test_SetsAdmin(address _newAdmin) external {
-    _assumeSafeAdmin(_newAdmin);
-
-    vm.prank(admin);
-    rollbackManager.setAdmin(_newAdmin);
-
-    assertEq(rollbackManager.admin(), _newAdmin);
-  }
-
-  function testFuzz_EmitsAdminSet(address _newAdmin) external {
-    _assumeSafeAdmin(_newAdmin);
-
-    vm.expectEmit();
-    emit RollbackManager.AdminSet(admin, _newAdmin);
-    vm.prank(admin);
-    rollbackManager.setAdmin(_newAdmin);
-  }
-
-  function testFuzz_RevertIf_CallerIsNotAdmin(address _caller, address _newAdmin) external {
-    _assumeSafeAdmin(_newAdmin);
-    vm.assume(_caller != admin);
-
-    vm.expectRevert(RollbackManager.RollbackManager__Unauthorized.selector);
-    vm.prank(_caller);
-    rollbackManager.setAdmin(_newAdmin);
-  }
-
-  function test_RevertIf_NewAdminIsZeroAddress() external {
-    vm.expectRevert(RollbackManager.RollbackManager__InvalidAddress.selector);
-    vm.prank(admin);
-    rollbackManager.setAdmin(address(0));
-  }
-}
+contract SetAdmin is SetAdminBase, RollbackManagerTimelockControlTest {}
 
 contract GetRollbackId is RollbackManagerTimelockControlTest {
   function test_ReturnsRollbackId(
