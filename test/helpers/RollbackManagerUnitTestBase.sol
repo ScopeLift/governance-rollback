@@ -2,7 +2,7 @@
 pragma solidity ^0.8.30;
 
 // Contract Imports
-import {RollbackManager, Rollback} from "src/RollbackManager.sol";
+import {RollbackManager, Rollback, IGovernor} from "src/RollbackManager.sol";
 
 // Test Imports
 import {Test} from "forge-std/Test.sol";
@@ -286,5 +286,164 @@ abstract contract GetRollbackBase is RollbackManagerUnitTestBase {
     assertEq(_rollback.executableAt, 0);
     assertEq(_rollback.canceled, false);
     assertEq(_rollback.executed, false);
+  }
+}
+
+abstract contract ProposeBase is RollbackManagerUnitTestBase {
+  function testFuzz_AdminProposeRollbackReturnsId(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _computedRollbackId = rollbackManager.getRollbackId(_targets, _values, _calldatas, _description);
+
+    vm.prank(admin);
+    uint256 _rollbackId = rollbackManager.propose(_targets, _values, _calldatas, _description);
+
+    assertEq(_rollbackId, _computedRollbackId);
+  }
+
+  function testFuzz_EmitsRollbackProposed(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _computedRollbackId = rollbackManager.getRollbackId(_targets, _values, _calldatas, _description);
+
+    vm.expectEmit();
+    emit RollbackManager.RollbackProposed(
+      _computedRollbackId, block.timestamp + rollbackQueueableDuration, _targets, _values, _calldatas, _description
+    );
+
+    vm.prank(admin);
+    rollbackManager.propose(_targets, _values, _calldatas, _description);
+  }
+
+  function testFuzz_RollbackStateIsCorrectlySet(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _computedRollbackId = rollbackManager.getRollbackId(_targets, _values, _calldatas, _description);
+
+    vm.prank(admin);
+    rollbackManager.propose(_targets, _values, _calldatas, _description);
+
+    Rollback memory _rollback = rollbackManager.getRollback(_computedRollbackId);
+
+    assertEq(_rollback.queueExpiresAt, block.timestamp + rollbackQueueableDuration);
+    assertEq(_rollback.executableAt, 0);
+    assertEq(_rollback.canceled, false);
+    assertEq(_rollback.executed, false);
+  }
+
+  function testFuzz_SetsStateToPending(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _computedRollbackId = rollbackManager.getRollbackId(_targets, _values, _calldatas, _description);
+
+    vm.prank(admin);
+    rollbackManager.propose(_targets, _values, _calldatas, _description);
+
+    IGovernor.ProposalState _state = rollbackManager.state(_computedRollbackId);
+    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Pending));
+  }
+
+  function testFuzz_SetsExpirationTimeBasedOnDuration(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description,
+    uint256 _rollbackQueueableDuration
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    _rollbackQueueableDuration =
+      _boundToRealisticRollbackQueueableDuration(_rollbackQueueableDuration, minRollbackQueueableDuration);
+
+    vm.startPrank(admin);
+    // Set the rollback queueable duration to the new value.
+    rollbackManager.setRollbackQueueableDuration(_rollbackQueueableDuration);
+    uint256 _rollbackId = rollbackManager.propose(_targets, _values, _calldatas, _description);
+    vm.stopPrank();
+
+    assertEq(rollbackManager.getRollback(_rollbackId).queueExpiresAt, block.timestamp + _rollbackQueueableDuration);
+  }
+
+  function testFuzz_RevertIf_RollbackAlreadyExists(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    vm.startPrank(admin);
+    uint256 _rollbackId = rollbackManager.propose(_targets, _values, _calldatas, _description);
+    vm.expectRevert(abi.encodeWithSelector(RollbackManager.RollbackManager__AlreadyExists.selector, _rollbackId));
+    rollbackManager.propose(_targets, _values, _calldatas, _description);
+    vm.stopPrank();
+  }
+
+  function testFuzz_RevertIf_MismatchedParameters(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256[] memory _valuesMismatch = new uint256[](1);
+    bytes[] memory _calldatasMismatch = new bytes[](1);
+
+    vm.startPrank(admin);
+
+    // target and values length mismatch
+    vm.expectRevert(RollbackManager.RollbackManager__MismatchedParameters.selector);
+    rollbackManager.propose(_targets, _valuesMismatch, _calldatas, _description);
+
+    // target and calldatas length mismatch
+    vm.expectRevert(RollbackManager.RollbackManager__MismatchedParameters.selector);
+    rollbackManager.propose(_targets, _values, _calldatasMismatch, _description);
+
+    vm.stopPrank();
+  }
+
+  function testFuzz_RevertIf_CallerIsNotAdmin(
+    address _caller,
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description
+  ) external {
+    vm.assume(_caller != admin);
+
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    vm.expectRevert(RollbackManager.RollbackManager__Unauthorized.selector);
+    vm.prank(_caller);
+    rollbackManager.propose(_targets, _values, _calldatas, _description);
   }
 }
