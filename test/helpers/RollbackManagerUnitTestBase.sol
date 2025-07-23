@@ -1463,3 +1463,16 @@ abstract contract SetAdminBase is RollbackManagerUnitTestBase {
     rollbackManager.setAdmin(address(0));
   }
 }
+
+abstract contract GetRollbackIdBase is RollbackManagerUnitTestBase {
+  function test_ReturnsRollbackId(
+    address[] memory _targets,
+    uint256[] memory _values,
+    bytes[] memory _calldatas,
+    string memory _description
+  ) external view {
+    uint256 _rollbackId = rollbackManager.getRollbackId(_targets, _values, _calldatas, _description);
+
+    assertEq(_rollbackId, uint256(keccak256(abi.encode(_targets, _values, _calldatas, _description))));
+  }
+}
