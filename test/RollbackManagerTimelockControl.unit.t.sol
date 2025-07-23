@@ -1320,15 +1320,17 @@ contract IsRollbackExecutable is RollbackManagerTimelockControlTest {
     address[2] memory _targetsFixed,
     uint256[2] memory _valuesFixed,
     bytes[2] memory _calldatasFixed,
-    string memory _description
+    string memory _description,
+    uint256 _delayAfterQueuing
   ) external {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
 
     uint256 _rollbackId = _queueRollback(_targets, _values, _calldatas, _description);
 
-    // Warp to just before the delay period
-    vm.warp(block.timestamp + targetTimelock.getMinDelay() - 1);
+    // Bound the delay to be before the timelock delay
+    _delayAfterQueuing = bound(_delayAfterQueuing, 0, targetTimelock.getMinDelay() - 1);
+    vm.warp(block.timestamp + _delayAfterQueuing);
 
     bool _isExecutable = rollbackManager.isRollbackExecutable(_rollbackId);
     assertFalse(_isExecutable);
