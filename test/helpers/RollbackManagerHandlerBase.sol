@@ -23,7 +23,7 @@ abstract contract RollbackManagerHandlerBase is Test {
 
   FakeProtocolContract[] public rollbackProposalTargets;
   RollbackSet public _rollbackSet;
-  bytes4[] public selectors;
+  bytes4[] public proposalCalldataSelectors;
 
   address public admin;
   address public guardian;
@@ -48,7 +48,7 @@ abstract contract RollbackManagerHandlerBase is Test {
       rollbackProposalTargets.push(_targets[i]);
     }
 
-    selectors = [FakeProtocolContract.setFee.selector, FakeProtocolContract.setFeeGuardian.selector];
+    proposalCalldataSelectors = [FakeProtocolContract.setFee.selector, FakeProtocolContract.setFeeGuardian.selector];
 
     // Note: Rollback Manager address will be set by child class after initialization
   }
@@ -71,7 +71,7 @@ abstract contract RollbackManagerHandlerBase is Test {
   function propose(uint256 _rollbackFee) external countCall("propose") {
     // Get the rollback transactions
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) = RollbackTransactionGenerator
-      .generateRandomRollbackTransactions(_rollbackFee, guardian, rollbackProposalTargets, selectors);
+      .generateRandomRollbackTransactions(_rollbackFee, guardian, rollbackProposalTargets, proposalCalldataSelectors);
 
     // Get the rollback ID
     uint256 _rollbackId = _getRollbackManager().getRollbackId(_targets, _values, _calldatas, _getDescription());
