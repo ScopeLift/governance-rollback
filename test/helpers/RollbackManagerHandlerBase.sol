@@ -21,9 +21,9 @@ import {RollbackManager} from "src/RollbackManager.sol";
 abstract contract RollbackManagerHandlerBase is Test {
   using LibRollbackSet for RollbackSet;
 
-  FakeProtocolContract[] public targets;
+  FakeProtocolContract[] public rollbackProposalTargets;
   RollbackSet public _rollbackSet;
-  bytes4[] public selectors;
+  bytes4[] public proposalCalldataSelectors;
 
   address public admin;
   address public guardian;
@@ -45,10 +45,10 @@ abstract contract RollbackManagerHandlerBase is Test {
     guardian = _guardian;
 
     for (uint256 i = 0; i < _targets.length; i++) {
-      targets.push(_targets[i]);
+      rollbackProposalTargets.push(_targets[i]);
     }
 
-    selectors = [FakeProtocolContract.setFee.selector, FakeProtocolContract.setFeeGuardian.selector];
+    proposalCalldataSelectors = [FakeProtocolContract.setFee.selector, FakeProtocolContract.setFeeGuardian.selector];
 
     // Note: Rollback Manager address will be set by child class after initialization
   }
@@ -70,8 +70,8 @@ abstract contract RollbackManagerHandlerBase is Test {
   /// @param _rollbackFee The new fee
   function propose(uint256 _rollbackFee) external countCall("propose") {
     // Get the rollback transactions
-    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
-      RollbackTransactionGenerator.generateRandomRollbackTransactions(_rollbackFee, guardian, targets, selectors);
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) = RollbackTransactionGenerator
+      .generateRandomRollbackTransactions(_rollbackFee, guardian, rollbackProposalTargets, proposalCalldataSelectors);
 
     // Get the rollback ID
     uint256 _rollbackId = _getRollbackManager().getRollbackId(_targets, _values, _calldatas, _getDescription());
