@@ -151,4 +151,13 @@ contract SetRollbackQueueableDuration is SetRollbackQueueableDurationBase, Rollb
 
 contract SetAdmin is SetAdminBase, RollbackManagerTimelockCompoundTest {}
 
-contract GetRollbackId is GetRollbackIdBase, RollbackManagerTimelockCompoundTest {}
+contract GetRollbackId is GetRollbackIdBase, RollbackManagerTimelockCompoundTest {
+  function _getExpectedRollbackId(
+    address[] memory _targets,
+    uint256[] memory _values,
+    bytes[] memory _calldatas,
+    string memory _description
+  ) internal view override returns (uint256) {
+    return uint256(keccak256(abi.encode(_targets, _values, _calldatas, _description)));
+  }
+}

@@ -1469,9 +1469,22 @@ abstract contract GetRollbackIdBase is RollbackManagerUnitTestBase {
     uint256[] memory _values,
     bytes[] memory _calldatas,
     string memory _description
-  ) external view {
+  ) external view virtual {
     uint256 _rollbackId = rollbackManager.getRollbackId(_targets, _values, _calldatas, _description);
-
-    assertEq(_rollbackId, uint256(keccak256(abi.encode(_targets, _values, _calldatas, _description))));
+    uint256 _expectedRollbackId = _getExpectedRollbackId(_targets, _values, _calldatas, _description);
+    assertEq(_rollbackId, _expectedRollbackId);
   }
+
+  /// @notice Virtual function that child classes must implement to provide their specific rollback ID calculation
+  /// @param _targets The targets of the transactions
+  /// @param _values The values of the transactions
+  /// @param _calldatas The calldatas of the transactions
+  /// @param _description The description of the rollback
+  /// @return The expected rollback ID for this implementation
+  function _getExpectedRollbackId(
+    address[] memory _targets,
+    uint256[] memory _values,
+    bytes[] memory _calldatas,
+    string memory _description
+  ) internal view virtual returns (uint256);
 }

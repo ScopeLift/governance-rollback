@@ -169,4 +169,15 @@ contract SetRollbackQueueableDuration is SetRollbackQueueableDurationBase, Rollb
 
 contract SetAdmin is SetAdminBase, RollbackManagerTimelockControlTest {}
 
-contract GetRollbackId is GetRollbackIdBase, RollbackManagerTimelockControlTest {}
+contract GetRollbackId is GetRollbackIdBase, RollbackManagerTimelockControlTest {
+  function _getExpectedRollbackId(
+    address[] memory _targets,
+    uint256[] memory _values,
+    bytes[] memory _calldatas,
+    string memory _description
+  ) internal view override returns (uint256) {
+    bytes32 _salt = bytes20(address(rollbackManager)) ^ keccak256(bytes(_description));
+    bytes32 _expectedHash = targetTimelock.hashOperationBatch(_targets, _values, _calldatas, 0, _salt);
+    return uint256(_expectedHash);
+  }
+}
