@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 // External Imports
 import {ICompoundTimelock} from "@openzeppelin/contracts/vendor/compound/ICompoundTimelock.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 // Internal Imports
 import {ITimelockMultiAdminShim} from "interfaces/ITimelockMultiAdminShim.sol";
@@ -13,7 +14,7 @@ import {ITimelockMultiAdminShim} from "interfaces/ITimelockMultiAdminShim.sol";
 /// @dev Security Model:
 ///      - Only the admin can queue transactions targeting this shim contract (e.g., configuration changes).
 ///      - The admin and any authorized executor can queue transactions targeting external contracts.
-contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
+contract TimelockMultiAdminShim is ITimelockMultiAdminShim, ReentrancyGuard {
   /*///////////////////////////////////////////////////////////////
                           Errors
   //////////////////////////////////////////////////////////////*/
@@ -144,6 +145,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
   /// @return The hash of the queued transaction.
   function queueTransaction(address _target, uint256 _value, string memory _signature, bytes memory _data, uint256 _eta)
     public
+    nonReentrant
     returns (bytes32)
   {
     _revertIfCannotQueue(_target);
@@ -162,7 +164,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     string memory _signature,
     bytes memory _data,
     uint256 _eta
-  ) public {
+  ) public nonReentrant {
     _revertIfNotAdminOrExecutor();
     TIMELOCK.cancelTransaction(_target, _value, _signature, _data, _eta);
   }
@@ -180,7 +182,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     string memory _signature,
     bytes memory _data,
     uint256 _eta
-  ) public payable returns (bytes memory) {
+  ) public payable nonReentrant returns (bytes memory) {
     _revertIfNotAdminOrExecutor();
     return TIMELOCK.executeTransaction(_target, _value, _signature, _data, _eta);
   }
