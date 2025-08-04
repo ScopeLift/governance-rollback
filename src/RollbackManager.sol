@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 // External Libraries
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 // Internal Libraries
 import {IRollbackManager, Rollback} from "interfaces/IRollbackManager.sol";
@@ -17,7 +18,7 @@ import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 ///      - Guardian queues them for execution within a specified window
 ///      - Guardian later executes or cancels the queued rollback.
 ///      - On queuing / cancelling / executing, the transactions are sent to TARGET_TIMELOCK.
-abstract contract RollbackManager is IRollbackManager {
+abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
   /*///////////////////////////////////////////////////////////////
                           Errors
   //////////////////////////////////////////////////////////////*/
@@ -217,7 +218,7 @@ abstract contract RollbackManager is IRollbackManager {
     uint256[] memory _values,
     bytes[] memory _calldatas,
     string memory _description
-  ) external returns (uint256 _rollbackId) {
+  ) external nonReentrant returns (uint256 _rollbackId) {
     _revertIfNotGuardian();
     _revertIfMismatchedParameters(_targets, _values, _calldatas);
 
@@ -260,7 +261,7 @@ abstract contract RollbackManager is IRollbackManager {
     uint256[] memory _values,
     bytes[] memory _calldatas,
     string memory _description
-  ) external returns (uint256 _rollbackId) {
+  ) external nonReentrant returns (uint256 _rollbackId) {
     _revertIfNotGuardian();
     _revertIfMismatchedParameters(_targets, _values, _calldatas);
 
@@ -296,7 +297,7 @@ abstract contract RollbackManager is IRollbackManager {
     uint256[] memory _values,
     bytes[] memory _calldatas,
     string memory _description
-  ) external returns (uint256 _rollbackId) {
+  ) external nonReentrant returns (uint256 _rollbackId) {
     _revertIfNotGuardian();
     _revertIfMismatchedParameters(_targets, _values, _calldatas);
 
