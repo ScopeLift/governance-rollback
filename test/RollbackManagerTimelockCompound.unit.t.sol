@@ -157,7 +157,7 @@ contract GetRollbackId is GetRollbackIdBase, RollbackManagerTimelockCompoundTest
     uint256[] memory _values,
     bytes[] memory _calldatas,
     string memory _description
-  ) internal view override returns (uint256) {
+  ) internal pure override returns (uint256) {
     return uint256(keccak256(abi.encode(_targets, _values, _calldatas, _description)));
   }
 }
