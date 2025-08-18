@@ -62,7 +62,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
   address public admin;
 
   /// @notice Tracks which addresses are authorized to execute queue and execute transactions.
-  mapping(address => bool) public isExecutor;
+  mapping(address executor => bool isAuthorized) public isExecutor;
 
   /*///////////////////////////////////////////////////////////////
                             Constructor
