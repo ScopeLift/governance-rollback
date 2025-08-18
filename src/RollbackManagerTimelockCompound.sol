@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity 0.8.30;
 
 // Internal Libraries
 import {RollbackManager} from "src/RollbackManager.sol";
