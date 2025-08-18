@@ -161,7 +161,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim, ReentrancyGuard {
     uint256 _eta
   ) public payable nonReentrant returns (bytes memory) {
     _revertIfNotAdminOrExecutor();
-    return TIMELOCK.executeTransaction(_target, _value, _signature, _data, _eta);
+    return TIMELOCK.executeTransaction{value: address(this).balance}(_target, _value, _signature, _data, _eta);
   }
 
   /// @inheritdoc ITimelockMultiAdminShim
