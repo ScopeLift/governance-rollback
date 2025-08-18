@@ -59,7 +59,7 @@ contract RollbackManagerTimelockControl is RollbackManager {
   /// @param _calldatas The calldatas of the transactions.
   /// @param _description The description of the rollback.
   /// @return The rollback ID.
-  /// @dev This rollback id can be produced from the rollback data which is part of the {RollbackCreated} event.
+  /// @dev This rollback id can be produced from the rollback data which is part of the {RollbackProposed} event.
   ///      It can even be computed in advance, before the rollback is proposed.
   function getRollbackId(
     address[] memory _targets,
