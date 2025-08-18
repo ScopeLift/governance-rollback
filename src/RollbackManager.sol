@@ -122,7 +122,7 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
   uint256 public rollbackQueueableDuration;
 
   /// @notice Rollback id to rollback data.
-  mapping(uint256 rollbackId => Rollback) internal rollbacks;
+  mapping(uint256 rollbackId => Rollback rollbackData) internal rollbacks;
 
   /*///////////////////////////////////////////////////////////////
                           Constructor
