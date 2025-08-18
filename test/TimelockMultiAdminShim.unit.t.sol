@@ -469,20 +469,35 @@ contract ExecuteTransaction is TimelockMultiAdminShimTest {
     assertEq(timelockTxnCall.eta, _eta);
   }
 
-  function testFuzz_CanCallExecuteTransactionWithValue(
+  function testFuzz_FlushesAccidentallySentETH(
     address _target,
     uint256 _value,
     string memory _signature,
     bytes memory _data,
-    uint256 _eta
+    uint256 _eta,
+    uint256 _accidentalETH
   ) external {
     _value = bound(_value, 0, 10 ether);
+    _accidentalETH = bound(_accidentalETH, 1 ether, 5 ether);
+
+    // Simulate someone accidentally sending ETH to the shim contract
+    vm.deal(address(timelockMultiAdminShim), _accidentalETH);
+    assertEq(address(timelockMultiAdminShim).balance, _accidentalETH);
+
     vm.deal(admin, _value);
     vm.prank(admin);
 
+    // Execute transaction - should flush ALL ETH (both the intended value and accidental ETH)
     timelockMultiAdminShim.executeTransaction{value: _value}(_target, _value, _signature, _data, _eta);
 
-    assertEq(address(timelockMultiAdminShim).balance, _value);
+    // Verify that ALL ETH was flushed (both the intended value and the accidental ETH)
+    assertEq(address(timelockMultiAdminShim).balance, 0);
+
+    // Verify that the timelock received the original intended value as the parameter
+    // (the timelock actually receives all ETH via {value: address(this).balance},
+    // but the _value parameter is still the original intended value)
+    MockCompoundTimelock.TimelockTransactionCall memory timelockTxnCall = timelock.lastParam__executeTransaction__();
+    assertEq(timelockTxnCall.value, _value);
   }
 
   function testFuzz_RevertIf_CallerIsNotAdminOrExecutor(
