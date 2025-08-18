@@ -24,6 +24,7 @@ import {ITimelockTargetCompound} from "interfaces/ITimelockTargetCompound.sol";
 /// Timelock.
 /// @dev Source:
 /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/ba35d580f47ba90494eb9f3d26f58f7949b10c67/contracts/vendor/compound/ICompoundTimelock.sol
+/// @custom:security-contact https://immunefi.com/bug-bounty/compoundfinance/information/
 contract RollbackManagerTimelockCompound is RollbackManager {
   /*///////////////////////////////////////////////////////////////
                           Constructor
