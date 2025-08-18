@@ -170,7 +170,7 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, RollbackManager
     govHelper.executeProposal(_upgradeProposal);
 
     // 4. Accept Admin role to the shim
-    TimelockMultiAdminShim(timelockMultiAdminShim).acceptAdmin();
+    TimelockMultiAdminShim(payable(timelockMultiAdminShim)).acceptAdmin();
 
     // 5. Add remaining votes and queue and execute the normal proposal
     govHelper.passProposalWithRoll(normalProposalId, 3, 6);
