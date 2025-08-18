@@ -14,6 +14,7 @@ import {ITimelockMultiAdminShim} from "interfaces/ITimelockMultiAdminShim.sol";
 /// @dev Security Model:
 ///      - Only the admin can queue transactions targeting this shim contract (e.g., configuration changes).
 ///      - The admin and any authorized executor can queue transactions targeting external contracts.
+/// @custom:security-contact https://immunefi.com/bug-bounty/compoundfinance/information/
 contract TimelockMultiAdminShim is ITimelockMultiAdminShim, ReentrancyGuard {
   /*///////////////////////////////////////////////////////////////
                           Errors

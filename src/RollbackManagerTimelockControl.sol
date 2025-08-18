@@ -26,6 +26,7 @@ import {ITimelockTargetControl} from "interfaces/ITimelockTargetControl.sol";
 /// admin privileges to propose rollbacks to this RollbackManagerTimelockControl.
 /// @dev Source:
 /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/ba35d580f47ba90494eb9f3d26f58f7949b10c67/contracts/governance/TimelockController.sol
+/// @custom:security-contact https://immunefi.com/bug-bounty/openzeppelin/information/
 contract RollbackManagerTimelockControl is RollbackManager {
   /*///////////////////////////////////////////////////////////////
                           Constructor
