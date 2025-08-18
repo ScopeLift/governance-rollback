@@ -18,12 +18,12 @@ contract AcceptAdmin is Script, BaseLogger, RollbackManagerTimelockCompoundDeplo
     }
 
     // Accept admin
-    TimelockMultiAdminShim(TIMELOCK_MULTI_ADMIN_SHIM).acceptAdmin();
+    TimelockMultiAdminShim(payable(TIMELOCK_MULTI_ADMIN_SHIM)).acceptAdmin();
 
     vm.stopBroadcast();
   }
 
   function invokeAcceptAdmin(address timelockMultiAdminShim) public {
-    TimelockMultiAdminShim(timelockMultiAdminShim).acceptAdmin();
+    TimelockMultiAdminShim(payable(timelockMultiAdminShim)).acceptAdmin();
   }
 }
