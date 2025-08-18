@@ -523,9 +523,13 @@ contract AcceptAdmin is TimelockMultiAdminShimTest {
   }
 }
 
-contract Fallback is TimelockMultiAdminShimTest {
-  function test_FallbackFunctionalityForUnknownCalls() external {
-    (bool success,) = address(timelockMultiAdminShim).call(abi.encodeWithSignature("randomFunction()"));
+contract Receive is TimelockMultiAdminShimTest {
+  function testFuzz_ReceiveAcceptsEther(uint256 _amount) external {
+    _amount = bound(_amount, 0, 10 ether);
+    vm.deal(address(this), _amount);
+    assertEq(address(timelockMultiAdminShim).balance, 0);
+    (bool success,) = payable(address(timelockMultiAdminShim)).call{value: _amount}("");
     assertTrue(success);
+    assertEq(address(timelockMultiAdminShim).balance, _amount);
   }
 }
