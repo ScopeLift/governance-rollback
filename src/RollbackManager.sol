@@ -180,10 +180,10 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
   ///      Proposes a rollback by submitting the target transactions and their metadata.
   ///      Does not queue or execute the rollback — it simply stages it for guardian review.
   function propose(
-    address[] memory _targets,
-    uint256[] memory _values,
-    bytes[] memory _calldatas,
-    string memory _description
+    address[] calldata _targets,
+    uint256[] calldata _values,
+    bytes[] calldata _calldatas,
+    string calldata _description
   ) external returns (uint256 _rollbackId) {
     _revertIfNotAdmin();
     _revertIfMismatchedParameters(_targets, _values, _calldatas);
@@ -214,10 +214,10 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
   ///      Must be called before the rollback queue window expires (`Rollback.queueExpiresAt`).
   ///      Queues the rollback transactions to enable optional execution during the allowed window.
   function queue(
-    address[] memory _targets,
-    uint256[] memory _values,
-    bytes[] memory _calldatas,
-    string memory _description
+    address[] calldata _targets,
+    uint256[] calldata _values,
+    bytes[] calldata _calldatas,
+    string calldata _description
   ) external nonReentrant returns (uint256 _rollbackId) {
     _revertIfNotGuardian();
     _revertIfMismatchedParameters(_targets, _values, _calldatas);
@@ -257,10 +257,10 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
   ///      Removes the rollback record, making it no longer executable.
   ///      Intended for cases where a previously queued rollback is determined to be unnecessary or invalid.
   function cancel(
-    address[] memory _targets,
-    uint256[] memory _values,
-    bytes[] memory _calldatas,
-    string memory _description
+    address[] calldata _targets,
+    uint256[] calldata _values,
+    bytes[] calldata _calldatas,
+    string calldata _description
   ) external nonReentrant returns (uint256 _rollbackId) {
     _revertIfNotGuardian();
     _revertIfMismatchedParameters(_targets, _values, _calldatas);
@@ -293,10 +293,10 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
   ///      Executes the queued rollback transactions after the execution window has begun (`Rollback.executableAt`).
   ///      Each transaction is forwarded to its target contract and executed sequentially.
   function execute(
-    address[] memory _targets,
-    uint256[] memory _values,
-    bytes[] memory _calldatas,
-    string memory _description
+    address[] calldata _targets,
+    uint256[] calldata _values,
+    bytes[] calldata _calldatas,
+    string calldata _description
   ) external nonReentrant returns (uint256 _rollbackId) {
     _revertIfNotGuardian();
     _revertIfMismatchedParameters(_targets, _values, _calldatas);
