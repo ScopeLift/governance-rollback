@@ -269,7 +269,7 @@ abstract contract RollbackManager is IRollbackManager {
     Rollback storage rollback = rollbacks[_rollbackId];
     IGovernor.ProposalState _state = _getState(_rollbackId);
 
-    // Revert if the rollback has been queued
+    // Revert if the rollback has not been queued.
     if (_state != IGovernor.ProposalState.Queued) {
       revert RollbackManager__NotQueued(_rollbackId);
     }
