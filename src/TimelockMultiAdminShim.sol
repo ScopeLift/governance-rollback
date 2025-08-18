@@ -268,9 +268,9 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim {
     emit ExecutorAdded(_newExecutor);
   }
 
-  /// @notice Fallback function to accept native transfers from the Governor
+  /// @notice Receive function to accept native transfers from the Governor
   /// @dev This is required because the Governor sends native to the timelock when executing proposals
-  ///      via Address.sendValue(payable($._timelock), msg.value). Without this fallback, such
+  ///      via Address.sendValue(payable($._timelock), msg.value). Without this receive function, such
   ///      transfers would revert, preventing proposal execution.
-  fallback() external {}
+  receive() external payable {}
 }
