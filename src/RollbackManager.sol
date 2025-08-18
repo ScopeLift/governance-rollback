@@ -170,10 +170,10 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
 
   /// @inheritdoc IRollbackManager
   function propose(
-    address[] memory _targets,
-    uint256[] memory _values,
-    bytes[] memory _calldatas,
-    string memory _description
+    address[] calldata _targets,
+    uint256[] calldata _values,
+    bytes[] calldata _calldatas,
+    string calldata _description
   ) external returns (uint256 _rollbackId) {
     _revertIfNotAdmin();
     _revertIfMismatchedParameters(_targets, _values, _calldatas);
@@ -196,10 +196,10 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
 
   /// @inheritdoc IRollbackManager
   function queue(
-    address[] memory _targets,
-    uint256[] memory _values,
-    bytes[] memory _calldatas,
-    string memory _description
+    address[] calldata _targets,
+    uint256[] calldata _values,
+    bytes[] calldata _calldatas,
+    string calldata _description
   ) external nonReentrant returns (uint256 _rollbackId) {
     _revertIfNotGuardian();
     _revertIfMismatchedParameters(_targets, _values, _calldatas);
@@ -231,10 +231,10 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
 
   /// @inheritdoc IRollbackManager
   function cancel(
-    address[] memory _targets,
-    uint256[] memory _values,
-    bytes[] memory _calldatas,
-    string memory _description
+    address[] calldata _targets,
+    uint256[] calldata _values,
+    bytes[] calldata _calldatas,
+    string calldata _description
   ) external nonReentrant returns (uint256 _rollbackId) {
     _revertIfNotGuardian();
     _revertIfMismatchedParameters(_targets, _values, _calldatas);
@@ -259,10 +259,10 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
 
   /// @inheritdoc IRollbackManager
   function execute(
-    address[] memory _targets,
-    uint256[] memory _values,
-    bytes[] memory _calldatas,
-    string memory _description
+    address[] calldata _targets,
+    uint256[] calldata _values,
+    bytes[] calldata _calldatas,
+    string calldata _description
   ) external payable nonReentrant returns (uint256 _rollbackId) {
     _revertIfNotGuardian();
     _revertIfMismatchedParameters(_targets, _values, _calldatas);
