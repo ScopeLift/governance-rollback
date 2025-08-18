@@ -297,7 +297,7 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
     uint256[] memory _values,
     bytes[] memory _calldatas,
     string memory _description
-  ) external nonReentrant returns (uint256 _rollbackId) {
+  ) external payable nonReentrant returns (uint256 _rollbackId) {
     _revertIfNotGuardian();
     _revertIfMismatchedParameters(_targets, _values, _calldatas);
 
