@@ -147,7 +147,7 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
       revert RollbackManager__InvalidRollbackQueueableDuration();
     }
 
-    if (address(_targetTimelock) == address(0)) {
+    if (_targetTimelock == address(0)) {
       revert RollbackManager__InvalidAddress();
     }
 
