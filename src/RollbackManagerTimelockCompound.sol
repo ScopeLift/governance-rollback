@@ -47,7 +47,7 @@ contract RollbackManagerTimelockCompound is RollbackManager {
   /// @param _calldatas The calldatas of the transactions.
   /// @param _description The description of the rollback.
   /// @return The rollback ID.
-  /// @dev This rollback id can be produced from the rollback data which is part of the {RollbackCreated} event.
+  /// @dev This rollback id can be produced from the rollback data which is part of the {RollbackProposed} event.
   ///      It can even be computed in advance, before the rollback is proposed.
   /// @dev Source:
   /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/ba35d580f47ba90494eb9f3d26f58f7949b10c67/contracts/governance/extensions/GovernorTimelockCompound.sol#L75
