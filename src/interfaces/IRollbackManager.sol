@@ -64,7 +64,7 @@ interface IRollbackManager {
     uint256[] memory _values,
     bytes[] memory _calldatas,
     string memory _description
-  ) external returns (uint256 _rollbackId);
+  ) external payable returns (uint256 _rollbackId);
 
   function setGuardian(address _newGuardian) external;
 
