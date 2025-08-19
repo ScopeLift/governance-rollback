@@ -43,4 +43,8 @@ interface ITimelockTargetCompound {
   /// @notice Returns the delay of the timelock.
   /// @return The delay of the timelock.
   function delay() external view returns (uint256);
+
+  /// @notice Returns the grace period of the timelock.
+  /// @return The grace period of the timelock.
+  function GRACE_PERIOD() external view returns (uint256);
 }
