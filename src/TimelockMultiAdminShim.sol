@@ -148,7 +148,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim, ReentrancyGuard {
     nonReentrant
     returns (bytes32)
   {
-    _revertIfCannotQueue(_target);
+    _revertIfCannotModifyShim(_target);
     return TIMELOCK.queueTransaction(_target, _value, _signature, _data, _eta);
   }
 
@@ -165,7 +165,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim, ReentrancyGuard {
     bytes memory _data,
     uint256 _eta
   ) public nonReentrant {
-    _revertIfNotAdminOrExecutor();
+    _revertIfCannotModifyShim(_target);
     TIMELOCK.cancelTransaction(_target, _value, _signature, _data, _eta);
   }
 
@@ -210,12 +210,12 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim, ReentrancyGuard {
                         Internal Functions
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Validates authorization for queueing transactions to the timelock.
+  /// @notice Validates authorization for modifying transactions targeting this shim.
   /// @param _target The address of the contract that the function call targets.
   /// @dev Reverts with TimelockMultiAdminShim__Unauthorized if:
   ///      - The target is this contract and the caller is not the admin.
   ///      - The target is an external contract and the caller is not the admin or an authorized executor.
-  function _revertIfCannotQueue(address _target) internal view {
+  function _revertIfCannotModifyShim(address _target) internal view {
     if (_target == address(this)) {
       _revertIfNotAdmin();
     }
