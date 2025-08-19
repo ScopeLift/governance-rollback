@@ -474,6 +474,10 @@ abstract contract RollbackManager is IRollbackManager {
 
     // Check if the rollback has been queued for execution.
     if (_rollback.executableAt != 0) {
+      // Check if the rollback is within the grace period
+      if (_isExpiredDueToGracePeriod(_rollbackId)) {
+        return IGovernor.ProposalState.Expired;
+      }
       return IGovernor.ProposalState.Queued;
     }
 
@@ -529,4 +533,9 @@ abstract contract RollbackManager is IRollbackManager {
     bytes[] memory _calldatas,
     string memory _description
   ) internal virtual;
+
+  /// @notice Returns whether a rollback has expired due to grace period constraints.
+  /// @param _rollbackId The rollback id to check.
+  /// @return True if the rollback has expired due to grace period, false otherwise.
+  function _isExpiredDueToGracePeriod(uint256 _rollbackId) internal view virtual returns (bool);
 }

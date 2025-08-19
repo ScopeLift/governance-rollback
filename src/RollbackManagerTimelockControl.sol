@@ -130,6 +130,12 @@ contract RollbackManagerTimelockControl is RollbackManager {
     );
   }
 
+  /// @notice Returns whether a rollback has expired due to grace period constraints.
+  /// @return False since OpenZeppelin timelocks have no upper time limit.
+  function _isExpiredDueToGracePeriod(uint256 /*_rollbackId*/ ) internal pure override returns (bool) {
+    return false;
+  }
+
   /*///////////////////////////////////////////////////////////////
                           Internal Functions
   //////////////////////////////////////////////////////////////*/
