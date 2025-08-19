@@ -60,6 +60,12 @@ contract MockTimelockTargetCompound is ITimelockTargetCompound {
     return abi.encode(_lastParam__executeTransactions__.length);
   }
 
+  /// @notice Returns the grace period of the timelock.
+  /// @return The grace period of the timelock.
+  function GRACE_PERIOD() external pure returns (uint256) {
+    return 14 days;
+  }
+
   // Helper function to clear all tracked call data
   function clearCallHistory() external {
     delete _lastParam__queueTransactions__;

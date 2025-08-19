@@ -157,6 +157,65 @@ contract Execute is ExecuteBase, RollbackManagerTimelockControlTest {
       assertEq(_lastExecuteBatchCall.calldatas[i], _calldatas[i]);
     }
   }
+
+  function testFuzz_WillExecuteARollbackAfterTimelockDelay(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description,
+    uint256 _timeOffset
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    // Propose a rollback
+    vm.prank(admin);
+    uint256 rollbackId = rollbackManager.propose(_targets, _values, _calldatas, _description);
+
+    // Queue the rollback
+    vm.prank(guardian);
+    rollbackManager.queue(_targets, _values, _calldatas, _description);
+
+    // Bound time offset to be after executable time (no upper bound for OZ)
+    _timeOffset = bound(_timeOffset, _timelockDelay(), _timelockDelay() + 30 days);
+
+    // Fast forward to executable time
+    vm.warp(block.timestamp + _timeOffset);
+
+    // Should be in Queued state (no upper bound for OZ)
+    assertEq(uint8(rollbackManager.state(rollbackId)), uint8(IGovernor.ProposalState.Queued));
+
+    // Execute should succeed
+    vm.prank(guardian);
+    rollbackManager.execute(_targets, _values, _calldatas, _description);
+  }
+
+  function testFuzz_WillNotExpireAfterTimelockDelay(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description,
+    uint256 _timeOffset
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    // Propose a rollback
+    vm.prank(admin);
+    uint256 rollbackId = rollbackManager.propose(_targets, _values, _calldatas, _description);
+
+    // Queue the rollback
+    vm.prank(guardian);
+    rollbackManager.queue(_targets, _values, _calldatas, _description);
+
+    // Bound time offset to be far in the future (years later)
+    _timeOffset = bound(_timeOffset, 1 days, 365 days * 10);
+
+    // Test that the rollback never expires (no upper bound for OZ)
+    // Should be Queued even far in the future
+    vm.warp(block.timestamp + _timeOffset);
+    assertEq(uint8(rollbackManager.state(rollbackId)), uint8(IGovernor.ProposalState.Queued));
+  }
 }
 
 contract State is StateBase, RollbackManagerTimelockControlTest {}

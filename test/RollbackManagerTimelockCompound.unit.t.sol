@@ -139,11 +139,173 @@ contract Execute is ExecuteBase, RollbackManagerTimelockCompoundTest {
       assertEq(_lastExecuteTransactionCalls[i].eta, _eta);
     }
   }
+
+  function testFuzz_WillExecuteARollbackWithinTheGracePeriod(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description,
+    uint256 _timeOffset
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    // Propose a rollback
+    vm.prank(admin);
+    uint256 rollbackId = rollbackManager.propose(_targets, _values, _calldatas, _description);
+
+    // Queue the rollback
+    vm.prank(guardian);
+    rollbackManager.queue(_targets, _values, _calldatas, _description);
+
+    // Bound time offset to be within grace period (after executable time but before grace period expires)
+    uint256 gracePeriod = targetTimelock.GRACE_PERIOD();
+    _timeOffset = bound(_timeOffset, _timelockDelay(), _timelockDelay() + gracePeriod - 1);
+
+    // Fast forward to executable time within grace period
+    vm.warp(block.timestamp + _timeOffset);
+
+    // Should be in Queued state (within grace period)
+    assertEq(uint8(rollbackManager.state(rollbackId)), uint8(IGovernor.ProposalState.Queued));
+
+    // Execute should succeed
+    vm.prank(guardian);
+    rollbackManager.execute(_targets, _values, _calldatas, _description);
+  }
+
+  function testFuzz_RevertWhen_TheGracePeriodHasElapsed(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description,
+    uint256 _timeOffset
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    // Propose a rollback
+    vm.prank(admin);
+    uint256 rollbackId = rollbackManager.propose(_targets, _values, _calldatas, _description);
+
+    // Queue the rollback
+    vm.prank(guardian);
+    rollbackManager.queue(_targets, _values, _calldatas, _description);
+
+    // Bound time offset to be after grace period expires
+    uint256 gracePeriod = targetTimelock.GRACE_PERIOD();
+    _timeOffset =
+      bound(_timeOffset, _timelockDelay() + gracePeriod + 1, _timelockDelay() + gracePeriod + 365 days * 100);
+
+    // Fast forward past grace period
+    vm.warp(block.timestamp + _timeOffset);
+
+    // Should be in Expired state (past grace period)
+    assertEq(uint8(rollbackManager.state(rollbackId)), uint8(IGovernor.ProposalState.Expired));
+
+    // Execute should revert because state is not Queued
+    vm.prank(guardian);
+    vm.expectRevert(abi.encodeWithSelector(RollbackManager.RollbackManager__NotQueued.selector, rollbackId));
+    rollbackManager.execute(_targets, _values, _calldatas, _description);
+  }
 }
 
-contract State is StateBase, RollbackManagerTimelockCompoundTest {}
+contract State is StateBase, RollbackManagerTimelockCompoundTest {
+  // Override the base test to account for Compound's grace period
+  function testFuzz_QueuedRollbackStateAfterExecutionTime(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description,
+    uint256 _timeOffset
+  ) external override {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
 
-contract IsRollbackExecutable is IsRollbackExecutableBase, RollbackManagerTimelockCompoundTest {}
+    uint256 _rollbackId = _queueRollback(_targets, _values, _calldatas, _description);
+
+    // Bound time offset to be within grace period (after executable time and including grace period boundary)
+    uint256 gracePeriod = targetTimelock.GRACE_PERIOD();
+    _timeOffset = bound(_timeOffset, _timelockDelay(), _timelockDelay() + gracePeriod);
+
+    // Warp to a time after the executable duration but within grace period
+    vm.warp(block.timestamp + _timeOffset);
+
+    IGovernor.ProposalState _state = rollbackManager.state(_rollbackId);
+    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Queued));
+  }
+
+  // Test that rollbacks properly expire after grace period for Compound timelocks
+  function testFuzz_ExpiredRollbackStateAfterGracePeriod(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description,
+    uint256 _timeOffset
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _queueRollback(_targets, _values, _calldatas, _description);
+
+    // Bound time offset to be after grace period expires
+    uint256 gracePeriod = targetTimelock.GRACE_PERIOD();
+    _timeOffset =
+      bound(_timeOffset, _timelockDelay() + gracePeriod + 1, _timelockDelay() + gracePeriod + 365 days * 100);
+
+    // Warp to a time after the grace period has expired
+    vm.warp(block.timestamp + _timeOffset);
+
+    IGovernor.ProposalState _state = rollbackManager.state(_rollbackId);
+    assertEq(uint8(_state), uint8(IGovernor.ProposalState.Expired));
+  }
+}
+
+contract IsRollbackExecutable is IsRollbackExecutableBase, RollbackManagerTimelockCompoundTest {
+  // Override the base test to account for Compound's grace period
+  function testFuzz_ReturnsTrueForQueuedRollbackAfterDelay(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description,
+    uint256 _delayAfterQueuing
+  ) external override {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _queueRollback(_targets, _values, _calldatas, _description);
+
+    // Bound the delay to be within the grace period (after timelock delay and including grace period boundary)
+    uint256 gracePeriod = targetTimelock.GRACE_PERIOD();
+    _delayAfterQueuing = bound(_delayAfterQueuing, _timelockDelay(), _timelockDelay() + gracePeriod);
+    vm.warp(block.timestamp + _delayAfterQueuing);
+
+    bool _isExecutable = rollbackManager.isRollbackExecutable(_rollbackId);
+    assertTrue(_isExecutable);
+  }
+
+  // Test that rollbacks are not executable after grace period expires for Compound timelocks
+  function testFuzz_ReturnsFalseForQueuedRollbackAfterGracePeriod(
+    address[2] memory _targetsFixed,
+    uint256[2] memory _valuesFixed,
+    bytes[2] memory _calldatasFixed,
+    string memory _description,
+    uint256 _delayAfterQueuing
+  ) external {
+    (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
+      toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
+
+    uint256 _rollbackId = _queueRollback(_targets, _values, _calldatas, _description);
+
+    // Bound the delay to be after grace period expires (use large bound to catch overflow bugs)
+    uint256 gracePeriod = targetTimelock.GRACE_PERIOD();
+    _delayAfterQueuing =
+      bound(_delayAfterQueuing, _timelockDelay() + gracePeriod + 1, _timelockDelay() + gracePeriod + 365 days * 100);
+    vm.warp(block.timestamp + _delayAfterQueuing);
+
+    bool _isExecutable = rollbackManager.isRollbackExecutable(_rollbackId);
+    assertFalse(_isExecutable);
+  }
+}
 
 contract SetGuardian is SetGuardianBase, RollbackManagerTimelockCompoundTest {}
 

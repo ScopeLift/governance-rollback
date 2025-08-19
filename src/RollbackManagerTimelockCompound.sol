@@ -134,6 +134,15 @@ contract RollbackManagerTimelockCompound is RollbackManager {
     }
   }
 
+  /// @notice Returns whether a rollback has expired due to grace period constraints.
+  /// @param _rollbackId The rollback id to check.
+  /// @return True if the rollback has expired due to grace period, false otherwise.
+  /// @dev For Compound timelocks, this checks if block.timestamp > eta + GRACE_PERIOD.
+  function _isExpiredDueToGracePeriod(uint256 _rollbackId) internal view override returns (bool) {
+    uint256 gracePeriod = ITimelockTargetCompound(TARGET_TIMELOCK).GRACE_PERIOD();
+    return block.timestamp > rollbacks[_rollbackId].executableAt + gracePeriod;
+  }
+
   /*///////////////////////////////////////////////////////////////
                           Internal Functions
   //////////////////////////////////////////////////////////////*/

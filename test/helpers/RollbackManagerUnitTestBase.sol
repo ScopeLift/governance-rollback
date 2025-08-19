@@ -1115,7 +1115,7 @@ abstract contract StateBase is RollbackManagerUnitTestBase {
     bytes[2] memory _calldatasFixed,
     string memory _description,
     uint256 _timeOffset
-  ) external {
+  ) external virtual {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
 
@@ -1337,7 +1337,7 @@ abstract contract IsRollbackExecutableBase is RollbackManagerUnitTestBase {
     bytes[2] memory _calldatasFixed,
     string memory _description,
     uint256 _delayAfterQueuing
-  ) external {
+  ) external virtual {
     (address[] memory _targets, uint256[] memory _values, bytes[] memory _calldatas) =
       toDynamicArrays(_targetsFixed, _valuesFixed, _calldatasFixed);
 
