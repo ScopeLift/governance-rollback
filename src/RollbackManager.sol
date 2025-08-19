@@ -349,12 +349,16 @@ abstract contract RollbackManager is IRollbackManager {
 
   /// @notice Returns the current state of a proposed rollback.
   /// @param _rollbackId The rollback id to check.
+  /// @return The current state of the rollback.
+  /// @dev Refer to {_getState} for details on the possible rollback states.
   function state(uint256 _rollbackId) external view returns (IGovernor.ProposalState) {
     return _getState(_rollbackId);
   }
 
   /// @notice Returns whether a rollback is executable.
   /// @param _rollbackId The rollback id to check.
+  /// @return Whether the rollback is executable.
+  /// @dev Refer to {_getState} for details on the possible rollback states.
   function isRollbackExecutable(uint256 _rollbackId) external view returns (bool) {
     if (_getState(_rollbackId) != IGovernor.ProposalState.Queued) {
       return false;
