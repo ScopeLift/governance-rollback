@@ -13,6 +13,7 @@ contract FakeProtocolContract is Ownable {
 
   event FeeSet(uint256 oldFee, uint256 newFee);
   event FeeGuardianSet(address oldFeeGuardian, address newFeeGuardian);
+  event EthReceived(uint256 amount);
 
   /// @notice Constructor sets the Compound Timelock as the owner
   /// @param _timelock The address of the Compound Timelock
@@ -32,6 +33,13 @@ contract FakeProtocolContract is Ownable {
     _checkOwner();
     emit FeeGuardianSet(feeGuardian, newFeeGuardian);
     feeGuardian = newFeeGuardian;
+  }
+
+  /// @notice Function that requires ETH to be sent - for testing ETH forwarding
+  /// @param _requiredAmount The amount of ETH that must be sent with this call
+  function setFeeWithEth(uint256 _requiredAmount) external payable {
+    require(msg.value == _requiredAmount, "Incorrect ETH amount");
+    emit EthReceived(msg.value);
   }
 
   /// @notice Allow contract to receive ETH

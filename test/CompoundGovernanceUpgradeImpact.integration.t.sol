@@ -181,4 +181,76 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, RollbackManager
     assertEq(fakeProtocolContract.fee(), feeWhenProposalIsExecuted);
     assertEq(fakeProtocolContract.feeGuardian(), feeGuardianWhenProposalIsExecuted);
   }
+
+  /// @notice Test that a proposal requiring ETH works when timelock has ETH
+  /// @dev This test demonstrates that the current implementation works for proposals
+  ///      that require ETH to be sent FROM the timelock (not WITH the execute call)
+  function test_ProposalRequiringEth_WorksWhenTimelockHasEth() external {
+    uint256 requiredEthAmount = 1 ether;
+
+    // 0. Record initial balance
+    uint256 initialBalance = address(fakeProtocolContract).balance;
+
+    // 1. Send ETH to the Compound Timelock so it has funds to spend
+    vm.deal(COMPOUND_TIMELOCK, requiredEthAmount);
+    assertEq(COMPOUND_TIMELOCK.balance, requiredEthAmount);
+
+    // 2. Create a proposal that requires ETH to be sent
+    address[] memory targets = new address[](1);
+    targets[0] = address(fakeProtocolContract);
+
+    uint256[] memory values = new uint256[](1);
+    values[0] = requiredEthAmount;
+
+    bytes[] memory calldatas = new bytes[](1);
+    calldatas[0] = abi.encodeWithSelector(fakeProtocolContract.setFeeWithEth.selector, requiredEthAmount);
+
+    string memory description = "Test proposal requiring ETH";
+    Proposal memory ethProposal = Proposal(targets, values, calldatas, description);
+
+    // 3. Upgrade to Shim
+    _proposeUpgradeAndExecuteProposalWithRoll();
+
+    // 4. Submit, vote, queue, and execute the ETH proposal
+    govHelper.submitPassAndQueue(proposer, ethProposal);
+    govHelper.executeQueuedProposal(ethProposal);
+
+    // 5. Verify execution - the proposal should work because timelock has ETH
+    assertEq(address(fakeProtocolContract).balance, initialBalance + requiredEthAmount);
+    assertEq(COMPOUND_TIMELOCK.balance, 0); // ETH should be spent
+  }
+
+  /// @notice Test that a proposal requiring ETH works when we send ETH along with the execute call
+  /// @dev This test demonstrates the scenario where ETH is sent WITH the execute call (not FROM the timelock)
+  function test_ProposalRequiringEth_WorksWhenEthIsSentAlongWithExecuteCall() external {
+    uint256 requiredEthAmount = 1 ether;
+
+    // 0. Verify initial state - contract should have no ETH initially
+    uint256 initialBalance = address(fakeProtocolContract).balance;
+    uint256 initialTimelockBalance = COMPOUND_TIMELOCK.balance;
+
+    // 1. Create a proposal that requires ETH to be sent
+    address[] memory targets = new address[](1);
+    targets[0] = address(fakeProtocolContract);
+
+    uint256[] memory values = new uint256[](1);
+    values[0] = requiredEthAmount;
+
+    bytes[] memory calldatas = new bytes[](1);
+    calldatas[0] = abi.encodeWithSelector(fakeProtocolContract.setFeeWithEth.selector, requiredEthAmount);
+
+    string memory description = "Test proposal requiring ETH";
+    Proposal memory ethProposal = Proposal(targets, values, calldatas, description);
+
+    // 2. Upgrade to Shim
+    _proposeUpgradeAndExecuteProposalWithRoll();
+
+    // 3. Submit, vote, and queue the ETH proposal
+    govHelper.submitPassAndQueue(proposer, ethProposal);
+
+    // 4. Execute with ETH
+    govHelper.executeQueuedProposal{value: requiredEthAmount}(ethProposal);
+    assertEq(address(fakeProtocolContract).balance, initialBalance + requiredEthAmount);
+    assertEq(COMPOUND_TIMELOCK.balance, initialTimelockBalance);
+  }
 }
