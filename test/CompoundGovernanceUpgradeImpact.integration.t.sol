@@ -185,25 +185,32 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, RollbackManager
   /// @notice Test that a proposal requiring ETH works when timelock has ETH
   /// @dev This test demonstrates that the current implementation works for proposals
   ///      that require ETH to be sent FROM the timelock (not WITH the execute call)
-  function test_ProposalRequiringEth_WorksWhenTimelockHasEth() external {
-    uint256 requiredEthAmount = 1 ether;
+  /// @dev Fuzzed to test various ETH amounts and any executor address
+  function testFuzz_ProposalRequiringEth_WorksWhenTimelockHasEth(uint256 _requiredEthAmount, address _executor)
+    external
+  {
+    _requiredEthAmount = bound(_requiredEthAmount, 0.0001 ether, 10 ether);
+
+    // Ensure executor is not zero address and not the timelock (which already has ETH)
+    vm.assume(_executor != address(0));
+    vm.assume(_executor != COMPOUND_TIMELOCK);
 
     // 0. Record initial balance
     uint256 initialBalance = address(fakeProtocolContract).balance;
 
     // 1. Send ETH to the Compound Timelock so it has funds to spend
-    vm.deal(COMPOUND_TIMELOCK, requiredEthAmount);
-    assertEq(COMPOUND_TIMELOCK.balance, requiredEthAmount);
+    vm.deal(COMPOUND_TIMELOCK, _requiredEthAmount);
+    assertEq(COMPOUND_TIMELOCK.balance, _requiredEthAmount);
 
     // 2. Create a proposal that requires ETH to be sent
     address[] memory targets = new address[](1);
     targets[0] = address(fakeProtocolContract);
 
     uint256[] memory values = new uint256[](1);
-    values[0] = requiredEthAmount;
+    values[0] = _requiredEthAmount;
 
     bytes[] memory calldatas = new bytes[](1);
-    calldatas[0] = abi.encodeWithSelector(fakeProtocolContract.setFeeWithEth.selector, requiredEthAmount);
+    calldatas[0] = abi.encodeWithSelector(fakeProtocolContract.setFeeWithEth.selector, _requiredEthAmount);
 
     string memory description = "Test proposal requiring ETH";
     Proposal memory ethProposal = Proposal(targets, values, calldatas, description);
@@ -211,19 +218,30 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, RollbackManager
     // 3. Upgrade to Shim
     _proposeUpgradeAndExecuteProposalWithRoll();
 
-    // 4. Submit, vote, queue, and execute the ETH proposal
+    // 4. Submit, vote, and queue the ETH proposal
     govHelper.submitPassAndQueue(proposer, ethProposal);
+
+    // 5. Execute with the fuzzed executor address (no ETH needed since timelock has it)
+    vm.prank(_executor);
     govHelper.executeQueuedProposal(ethProposal);
 
-    // 5. Verify execution - the proposal should work because timelock has ETH
-    assertEq(address(fakeProtocolContract).balance, initialBalance + requiredEthAmount);
+    // 6. Verify execution - the proposal should work because timelock has ETH
+    assertEq(address(fakeProtocolContract).balance, initialBalance + _requiredEthAmount);
     assertEq(COMPOUND_TIMELOCK.balance, 0); // ETH should be spent
   }
 
   /// @notice Test that a proposal requiring ETH works when we send ETH along with the execute call
   /// @dev This test demonstrates the scenario where ETH is sent WITH the execute call (not FROM the timelock)
-  function test_ProposalRequiringEth_WorksWhenEthIsSentAlongWithExecuteCall() external {
-    uint256 requiredEthAmount = 1 ether;
+  /// @dev Fuzzed to test various ETH amounts and any executor address
+  function testFuzz_ProposalRequiringEth_WorksWhenEthIsSentAlongWithExecuteCall(
+    uint256 _requiredEthAmount,
+    address _executor
+  ) external {
+    _requiredEthAmount = bound(_requiredEthAmount, 0.0001 ether, 10 ether);
+
+    // Ensure executor is not zero address and not the timelock (which already has ETH)
+    vm.assume(_executor != address(0));
+    vm.assume(_executor != COMPOUND_TIMELOCK);
 
     // 0. Verify initial state - contract should have no ETH initially
     uint256 initialBalance = address(fakeProtocolContract).balance;
@@ -234,10 +252,10 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, RollbackManager
     targets[0] = address(fakeProtocolContract);
 
     uint256[] memory values = new uint256[](1);
-    values[0] = requiredEthAmount;
+    values[0] = _requiredEthAmount;
 
     bytes[] memory calldatas = new bytes[](1);
-    calldatas[0] = abi.encodeWithSelector(fakeProtocolContract.setFeeWithEth.selector, requiredEthAmount);
+    calldatas[0] = abi.encodeWithSelector(fakeProtocolContract.setFeeWithEth.selector, _requiredEthAmount);
 
     string memory description = "Test proposal requiring ETH";
     Proposal memory ethProposal = Proposal(targets, values, calldatas, description);
@@ -248,9 +266,12 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, RollbackManager
     // 3. Submit, vote, and queue the ETH proposal
     govHelper.submitPassAndQueue(proposer, ethProposal);
 
-    // 4. Execute with ETH
-    govHelper.executeQueuedProposal{value: requiredEthAmount}(ethProposal);
-    assertEq(address(fakeProtocolContract).balance, initialBalance + requiredEthAmount);
+    // 4. Execute with ETH using the fuzzed executor address
+    // Give the executor enough ETH to send with the transaction (add a small buffer)
+    vm.deal(_executor, _requiredEthAmount + 1);
+    vm.prank(_executor);
+    govHelper.executeQueuedProposal{value: _requiredEthAmount}(ethProposal);
+    assertEq(address(fakeProtocolContract).balance, initialBalance + _requiredEthAmount);
     assertEq(COMPOUND_TIMELOCK.balance, initialTimelockBalance);
   }
 }
