@@ -163,22 +163,12 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
                           External Functions
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Get rollback data by ID.
-  /// @param _rollbackId The rollback ID.
-  /// @return The rollback data.
+  /// @inheritdoc IRollbackManager
   function getRollback(uint256 _rollbackId) external view returns (Rollback memory) {
     return rollbacks[_rollbackId];
   }
 
-  /// @notice Proposes a rollback which can be queued for execution.
-  /// @param _targets The targets of the transactions.
-  /// @param _values The values of the transactions.
-  /// @param _calldatas The calldatas of the transactions.
-  /// @param _description The description of the rollback.
-  /// @return _rollbackId The rollback ID.
-  /// @dev Can only be called by the admin.
-  ///      Proposes a rollback by submitting the target transactions and their metadata.
-  ///      Does not queue or execute the rollback — it simply stages it for guardian review.
+  /// @inheritdoc IRollbackManager
   function propose(
     address[] memory _targets,
     uint256[] memory _values,
@@ -204,15 +194,7 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
     emit RollbackProposed(_rollbackId, _expiresAt, _targets, _values, _calldatas, _description);
   }
 
-  /// @notice Queues a rollback for execution.
-  /// @param _targets The targets of the transactions.
-  /// @param _values The values of the transactions.
-  /// @param _calldatas The calldatas of the transactions.
-  /// @param _description The description of the rollback.
-  /// @return _rollbackId The rollback ID.
-  /// @dev Can only be called by the guardian.
-  ///      Must be called before the rollback queue window expires (`Rollback.queueExpiresAt`).
-  ///      Queues the rollback transactions to enable optional execution during the allowed window.
+  /// @inheritdoc IRollbackManager
   function queue(
     address[] memory _targets,
     uint256[] memory _values,
@@ -247,15 +229,7 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
     emit RollbackQueued(_rollbackId, _eta);
   }
 
-  /// @notice Cancels a previously queued rollback operation.
-  /// @param _targets The targets of the transactions.
-  /// @param _values The values of the transactions.
-  /// @param _calldatas The calldatas of the transactions.
-  /// @param _description The description of the rollback.
-  /// @return _rollbackId The rollback ID.
-  /// @dev Can only be called by the guardian.
-  ///      Removes the rollback record, making it no longer executable.
-  ///      Intended for cases where a previously queued rollback is determined to be unnecessary or invalid.
+  /// @inheritdoc IRollbackManager
   function cancel(
     address[] memory _targets,
     uint256[] memory _values,
@@ -283,15 +257,7 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
     emit RollbackCanceled(_rollbackId);
   }
 
-  ///  @notice Executes a previously queued rollback by the guardian, forwarding the call to each target contract.
-  /// @param _targets The targets of the transactions.
-  /// @param _values The values of the transactions.
-  /// @param _calldatas The calldatas of the transactions.
-  /// @param _description The description of the rollback.
-  /// @return _rollbackId The rollback ID.
-  /// @dev Can only be called by the guardian.
-  ///      Executes the queued rollback transactions after the execution window has begun (`Rollback.executableAt`).
-  ///      Each transaction is forwarded to its target contract and executed sequentially.
+  /// @inheritdoc IRollbackManager
   function execute(
     address[] memory _targets,
     uint256[] memory _values,
@@ -324,41 +290,31 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
     emit RollbackExecuted(_rollbackId);
   }
 
-  /// @notice Sets the guardian.
-  /// @param _newGuardian The new guardian.
-  /// @dev Can only be called by the admin.
+  /// @inheritdoc IRollbackManager
   function setGuardian(address _newGuardian) external {
     _revertIfNotAdmin();
     _setGuardian(_newGuardian);
   }
 
-  /// @notice Sets the rollback queueable duration.
-  /// @param _newRollbackQueueableDuration The new rollback queueable duration in seconds.
-  /// @dev Can only be called by the admin.
+  /// @inheritdoc IRollbackManager
   function setRollbackQueueableDuration(uint256 _newRollbackQueueableDuration) external {
     _revertIfNotAdmin();
     _setRollbackQueueableDuration(_newRollbackQueueableDuration);
   }
 
-  /// @notice Sets the admin.
-  /// @param _newAdmin The new admin.
-  /// @dev Can only be called by the admin.
+  /// @inheritdoc IRollbackManager
   function setAdmin(address _newAdmin) external {
     _revertIfNotAdmin();
     _setAdmin(_newAdmin);
   }
 
-  /// @notice Returns the current state of a proposed rollback.
-  /// @param _rollbackId The rollback id to check.
-  /// @return The current state of the rollback.
+  /// @inheritdoc IRollbackManager
   /// @dev Refer to {_getState} for details on the possible rollback states.
   function state(uint256 _rollbackId) external view returns (IGovernor.ProposalState) {
     return _getState(_rollbackId);
   }
 
-  /// @notice Returns whether a rollback is executable.
-  /// @param _rollbackId The rollback id to check.
-  /// @return Whether the rollback is executable.
+  /// @inheritdoc IRollbackManager
   /// @dev Refer to {_getState} for details on the possible rollback states.
   function isRollbackExecutable(uint256 _rollbackId) external view returns (bool) {
     if (_getState(_rollbackId) != IGovernor.ProposalState.Queued) {
@@ -371,14 +327,7 @@ abstract contract RollbackManager is IRollbackManager, ReentrancyGuard {
                           Public Functions
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Calculates the rollback id for a given set of parameters.
-  /// @param _targets The targets of the transactions.
-  /// @param _values The values of the transactions.
-  /// @param _calldatas The calldatas of the transactions.
-  /// @param _description The description of the rollback.
-  /// @return The rollback ID.
-  /// @dev This rollback id can be produced from the rollback data which is part of the {RollbackProposed} event.
-  ///      It can even be computed in advance, before the rollback is proposed.
+  /// @inheritdoc IRollbackManager
   function getRollbackId(
     address[] memory _targets,
     uint256[] memory _values,

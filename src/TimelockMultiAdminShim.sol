@@ -91,15 +91,13 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim, ReentrancyGuard {
                       External Functions
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Adds an executor to the timelock.
-  /// @param _newExecutor The address of the new executor.
+  /// @inheritdoc ITimelockMultiAdminShim
   function addExecutor(address _newExecutor) external {
     _revertIfNotTimelock();
     _addExecutor(_newExecutor);
   }
 
-  /// @notice Removes an executor from the timelock.
-  /// @param _executor The address of the executor to remove.
+  /// @inheritdoc ITimelockMultiAdminShim
   function removeExecutor(address _executor) external {
     _revertIfNotTimelock();
     _revertIfInvalidExecutor(_executor);
@@ -107,8 +105,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim, ReentrancyGuard {
     emit ExecutorRemoved(_executor);
   }
 
-  /// @notice Sets the admin.
-  /// @param _newAdmin The address of the new admin.
+  /// @inheritdoc ITimelockMultiAdminShim
   function setAdmin(address _newAdmin) external {
     _revertIfNotTimelock();
     _setAdmin(_newAdmin);
@@ -118,31 +115,22 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim, ReentrancyGuard {
                     Proxy Timelock Functions 
   //////////////////////////////////////////////////////////////*/
 
-  /// @notice Returns the grace period of the timelock.
-  /// @return The grace period of the timelock.
+  /// @inheritdoc ITimelockMultiAdminShim
   function GRACE_PERIOD() external view returns (uint256) {
     return TIMELOCK.GRACE_PERIOD();
   }
 
-  /// @notice Returns the minimum delay of the timelock.
-  /// @return The minimum delay of the timelock.
+  /// @inheritdoc ITimelockMultiAdminShim
   function MINIMUM_DELAY() external view returns (uint256) {
     return TIMELOCK.MINIMUM_DELAY();
   }
 
-  /// @notice Returns the maximum delay of the timelock.
-  /// @return The maximum delay of the timelock.
+  /// @inheritdoc ITimelockMultiAdminShim
   function MAXIMUM_DELAY() external view returns (uint256) {
     return TIMELOCK.MAXIMUM_DELAY();
   }
 
-  /// @notice Queues a transaction to the timelock.
-  /// @param _target The address of the contract to call.
-  /// @param _value The value to send with the transaction.
-  /// @param _signature The function signature to call.
-  /// @param _data The data to send with the transaction.
-  /// @param _eta The eta of the transaction.
-  /// @return The hash of the queued transaction.
+  /// @inheritdoc ITimelockMultiAdminShim
   function queueTransaction(address _target, uint256 _value, string memory _signature, bytes memory _data, uint256 _eta)
     public
     nonReentrant
@@ -152,12 +140,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim, ReentrancyGuard {
     return TIMELOCK.queueTransaction(_target, _value, _signature, _data, _eta);
   }
 
-  /// @notice Cancels a transaction on the timelock.
-  /// @param _target The address of the contract to call.
-  /// @param _value The value to send with the transaction.
-  /// @param _signature The function signature to call.
-  /// @param _data The data to send with the transaction.
-  /// @param _eta The eta of the transaction.
+  /// @inheritdoc ITimelockMultiAdminShim
   function cancelTransaction(
     address _target,
     uint256 _value,
@@ -169,13 +152,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim, ReentrancyGuard {
     TIMELOCK.cancelTransaction(_target, _value, _signature, _data, _eta);
   }
 
-  /// @notice Executes a transaction on the timelock.
-  /// @param _target The address of the contract to call.
-  /// @param _value The value to send with the transaction.
-  /// @param _signature The function signature to call.
-  /// @param _data The data to send with the transaction.
-  /// @param _eta The eta of the transaction.
-  /// @return The data returned by the transaction.
+  /// @inheritdoc ITimelockMultiAdminShim
   function executeTransaction(
     address _target,
     uint256 _value,
@@ -187,8 +164,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim, ReentrancyGuard {
     return TIMELOCK.executeTransaction(_target, _value, _signature, _data, _eta);
   }
 
-  /// @notice Returns the delay of the timelock.
-  /// @return The delay of the timelock.
+  /// @inheritdoc ITimelockMultiAdminShim
   function delay() external view returns (uint256) {
     return TIMELOCK.delay();
   }
@@ -200,8 +176,7 @@ contract TimelockMultiAdminShim is ITimelockMultiAdminShim, ReentrancyGuard {
     return TIMELOCK.queuedTransactions(_txHash);
   }
 
-  /// @notice Accepts admin role from the timelock on behalf of this contract.
-  /// @dev This is necessary to finalize the admin transfer when this contract is set as `pendingAdmin`.
+  /// @inheritdoc ITimelockMultiAdminShim
   function acceptAdmin() external {
     TIMELOCK.acceptAdmin();
   }
