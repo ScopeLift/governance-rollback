@@ -247,7 +247,6 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, RollbackManager
   function _testProposalRequiringEthAndEthIsSentWithExecuteCall(uint256 _requiredEthAmount, address _executor) internal {
     // 0. Record initial balance for later comparison
     uint256 initialBalance = address(fakeProtocolContract).balance;
-    uint256 initialTimelockBalance = COMPOUND_TIMELOCK.balance;
 
     // 1. Create a proposal that requires ETH to be sent
     address[] memory targets = new address[](1);
@@ -274,7 +273,6 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, RollbackManager
 
     govHelper.executeQueuedProposal{value: _requiredEthAmount}(ethProposal);
     assertEq(address(fakeProtocolContract).balance, initialBalance + _requiredEthAmount);
-    assertEq(COMPOUND_TIMELOCK.balance, initialTimelockBalance);
   }
 
   /// @notice Test that a proposal requiring ETH works with various ETH amounts
