@@ -509,7 +509,7 @@ contract ExecuteTransaction is TimelockMultiAdminShimTest {
     assertEq(timelockTxnCall.eta, _eta);
   }
 
-  function testFuzz_FlushesAccidentallySentETH(
+  function testFuzz_OnlyForwardsIntendedETH_DoesNotFlushAccidentalETH(
     address _target,
     uint256 _value,
     string memory _signature,
@@ -527,15 +527,15 @@ contract ExecuteTransaction is TimelockMultiAdminShimTest {
     vm.deal(admin, _value);
     vm.prank(admin);
 
-    // Execute transaction - should flush ALL ETH (both the intended value and accidental ETH)
+    // Execute transaction - should only forward the intended msg.value, not accidental ETH
     timelockMultiAdminShim.executeTransaction{value: _value}(_target, _value, _signature, _data, _eta);
 
-    // Verify that ALL ETH was flushed (both the intended value and the accidental ETH)
-    assertEq(address(timelockMultiAdminShim).balance, 0);
+    // Verify that accidental ETH remains in the contract (safer behavior)
+    assertEq(address(timelockMultiAdminShim).balance, _accidentalETH);
 
     // Verify that the timelock received the original intended value as the parameter
-    // (the timelock actually receives all ETH via {value: address(this).balance},
-    // but the _value parameter is still the original intended value)
+    // (the timelock receives ETH via {value: msg.value},
+    // and the _value parameter is the original intended value)
     MockCompoundTimelock.TimelockTransactionCall memory timelockTxnCall = timelock.lastParam__executeTransaction__();
     assertEq(timelockTxnCall.value, _value);
   }
