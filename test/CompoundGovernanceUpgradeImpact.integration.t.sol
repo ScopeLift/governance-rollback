@@ -212,9 +212,7 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, RollbackManager
     govHelper.submitPassAndQueue(proposer, ethProposal);
 
     // 5. Execute with the specified executor address (no ETH needed since timelock has it)
-    if (_executor != address(this)) {
-      vm.prank(_executor);
-    }
+    vm.prank(_executor);
     govHelper.executeQueuedProposal(ethProposal);
 
     // 6. Verify execution - the proposal should work because timelock has ETH
@@ -247,7 +245,7 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, RollbackManager
   /// @notice Internal helper function to test ETH proposal execution
   /// @dev This contains the core test logic that can be reused by different fuzz tests
   function _testProposalRequiringEthAndEthIsSentWithExecuteCall(uint256 _requiredEthAmount, address _executor) internal {
-    // 0. Verify initial state - contract should have no ETH initially
+    // 0. Record initial balance for later comparison
     uint256 initialBalance = address(fakeProtocolContract).balance;
     uint256 initialTimelockBalance = COMPOUND_TIMELOCK.balance;
 
@@ -271,11 +269,9 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, RollbackManager
     govHelper.submitPassAndQueue(proposer, ethProposal);
 
     // 4. Execute with ETH using the specified executor
-    if (_executor != address(this)) {
-      // Give the executor enough ETH to send with the transaction (add a small buffer)
-      vm.deal(_executor, _requiredEthAmount + 1);
-      vm.prank(_executor);
-    }
+    vm.deal(_executor, _requiredEthAmount + 1);
+    vm.prank(_executor);
+
     govHelper.executeQueuedProposal{value: _requiredEthAmount}(ethProposal);
     assertEq(address(fakeProtocolContract).balance, initialBalance + _requiredEthAmount);
     assertEq(COMPOUND_TIMELOCK.balance, initialTimelockBalance);
