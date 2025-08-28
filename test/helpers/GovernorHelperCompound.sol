@@ -244,14 +244,18 @@ contract GovernorHelperCompound is Test, RollbackManagerTimelockCompoundDeployIn
     return majorDelegates[_index];
   }
 
-  function executeQueuedProposal(Proposal memory _proposal) public {
+  function executeQueuedProposal(Proposal memory _proposal) public payable {
     uint256 _timeLockDelay = timelock.delay();
     vm.warp(block.timestamp + _timeLockDelay + 1);
-    governor.execute(_proposal.targets, _proposal.values, _proposal.calldatas, keccak256(bytes(_proposal.description)));
+    governor.execute{value: msg.value}(
+      _proposal.targets, _proposal.values, _proposal.calldatas, keccak256(bytes(_proposal.description))
+    );
   }
 
-  function executeProposal(Proposal memory _proposal) public {
-    governor.execute(_proposal.targets, _proposal.values, _proposal.calldatas, keccak256(bytes(_proposal.description)));
+  function executeProposal(Proposal memory _proposal) public payable {
+    governor.execute{value: msg.value}(
+      _proposal.targets, _proposal.values, _proposal.calldatas, keccak256(bytes(_proposal.description))
+    );
   }
 
   /* End CompoundGovernor-related helper methods */
