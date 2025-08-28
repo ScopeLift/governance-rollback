@@ -181,4 +181,120 @@ contract CompoundGovernanceUpgradeImpactIntegrationTest is Test, RollbackManager
     assertEq(fakeProtocolContract.fee(), feeWhenProposalIsExecuted);
     assertEq(fakeProtocolContract.feeGuardian(), feeGuardianWhenProposalIsExecuted);
   }
+
+  /// @notice Internal helper function to test ETH proposal execution when timelock has ETH
+  /// @dev This contains the core test logic for the "timelock has ETH" scenario
+  function _testProposalRequiringEthAndTimelockHasEth(uint256 _requiredEthAmount, address _executor) internal {
+    // 0. Record initial balance
+    uint256 initialBalance = address(fakeProtocolContract).balance;
+
+    // 1. Send ETH to the Compound Timelock so it has funds to spend
+    vm.deal(COMPOUND_TIMELOCK, _requiredEthAmount);
+    assertEq(COMPOUND_TIMELOCK.balance, _requiredEthAmount);
+
+    // 2. Create a proposal that requires ETH to be sent
+    address[] memory targets = new address[](1);
+    targets[0] = address(fakeProtocolContract);
+
+    uint256[] memory values = new uint256[](1);
+    values[0] = _requiredEthAmount;
+
+    bytes[] memory calldatas = new bytes[](1);
+    calldatas[0] = abi.encodeWithSelector(fakeProtocolContract.setFeeWithEth.selector, _requiredEthAmount);
+
+    string memory description = "Test proposal requiring ETH";
+    Proposal memory ethProposal = Proposal(targets, values, calldatas, description);
+
+    // 3. Upgrade to Shim
+    _proposeUpgradeAndExecuteProposalWithRoll();
+
+    // 4. Submit, vote, and queue the ETH proposal
+    govHelper.submitPassAndQueue(proposer, ethProposal);
+
+    // 5. Execute with the specified executor address (no ETH needed since timelock has it)
+    vm.prank(_executor);
+    govHelper.executeQueuedProposal(ethProposal);
+
+    // 6. Verify execution - the proposal should work because timelock has ETH
+    assertEq(address(fakeProtocolContract).balance, initialBalance + _requiredEthAmount);
+    assertEq(COMPOUND_TIMELOCK.balance, 0); // ETH should be spent
+  }
+
+  /// @notice Test that a proposal requiring ETH works when timelock has ETH - various amounts
+  /// @dev This test demonstrates that the current implementation works for proposals
+  ///      that require ETH to be sent FROM the timelock (not WITH the execute call)
+  /// @dev Fuzzed to test various ETH amounts with a fixed executor
+  function testFuzz_ProposalRequiringEthAndTimelockHasEth_VariousAmounts(uint256 _requiredEthAmount) external {
+    _requiredEthAmount = bound(_requiredEthAmount, 0.0001 ether, 10 ether);
+    _testProposalRequiringEthAndTimelockHasEth(_requiredEthAmount, address(this));
+  }
+
+  /// @notice Test that a proposal requiring ETH works when timelock has ETH - various executors
+  /// @dev This test demonstrates that any address can execute proposals when timelock has ETH
+  /// @dev Fuzzed to test various executor addresses with a fixed ETH amount
+  function testFuzz_ProposalRequiringEthAndTimelockHasEth_VariousExecutors(address _executor) external {
+    // Ensure executor is not zero address and not the timelock or shim (which can affect balances)
+    vm.assume(_executor != address(0));
+    vm.assume(_executor != COMPOUND_TIMELOCK);
+    vm.assume(_executor != timelockMultiAdminShim);
+
+    uint256 requiredEthAmount = 1 ether;
+    _testProposalRequiringEthAndTimelockHasEth(requiredEthAmount, _executor);
+  }
+
+  /// @notice Internal helper function to test ETH proposal execution
+  /// @dev This contains the core test logic that can be reused by different fuzz tests
+  function _testProposalRequiringEthAndEthIsSentWithExecuteCall(uint256 _requiredEthAmount, address _executor) internal {
+    // 0. Record initial balance for later comparison
+    uint256 initialBalance = address(fakeProtocolContract).balance;
+    uint256 initialTimelockBalance = COMPOUND_TIMELOCK.balance;
+
+    // 1. Create a proposal that requires ETH to be sent
+    address[] memory targets = new address[](1);
+    targets[0] = address(fakeProtocolContract);
+
+    uint256[] memory values = new uint256[](1);
+    values[0] = _requiredEthAmount;
+
+    bytes[] memory calldatas = new bytes[](1);
+    calldatas[0] = abi.encodeWithSelector(fakeProtocolContract.setFeeWithEth.selector, _requiredEthAmount);
+
+    string memory description = "Test proposal requiring ETH";
+    Proposal memory ethProposal = Proposal(targets, values, calldatas, description);
+
+    // 2. Upgrade to Shim
+    _proposeUpgradeAndExecuteProposalWithRoll();
+
+    // 3. Submit, vote, and queue the ETH proposal
+    govHelper.submitPassAndQueue(proposer, ethProposal);
+
+    // 4. Execute with ETH using the specified executor
+    vm.deal(_executor, _requiredEthAmount + 1);
+    vm.prank(_executor);
+
+    govHelper.executeQueuedProposal{value: _requiredEthAmount}(ethProposal);
+    assertEq(address(fakeProtocolContract).balance, initialBalance + _requiredEthAmount);
+    assertEq(COMPOUND_TIMELOCK.balance, initialTimelockBalance);
+  }
+
+  /// @notice Test that a proposal requiring ETH works with various ETH amounts
+  /// @dev This test demonstrates the scenario where ETH is sent WITH the execute call (not FROM the timelock)
+  /// @dev Fuzzed to test various ETH amounts with a fixed executor
+  function testFuzz_ProposalRequiringEthAndEthIsSentWithExecuteCall_VariousAmounts(uint256 _requiredEthAmount) external {
+    _requiredEthAmount = bound(_requiredEthAmount, 0.0001 ether, 10 ether);
+    _testProposalRequiringEthAndEthIsSentWithExecuteCall(_requiredEthAmount, address(this));
+  }
+
+  /// @notice Test that a proposal requiring ETH works with any executor address
+  /// @dev This test demonstrates that any address can execute proposals
+  /// @dev Fuzzed to test various executor addresses with a fixed ETH amount
+  function testFuzz_ProposalRequiringEthAndEthIsSentWithExecuteCall_VariousExecutors(address _executor) external {
+    // Ensure executor is not zero address and not the timelock or shim (which can affect balances)
+    vm.assume(_executor != address(0));
+    vm.assume(_executor != COMPOUND_TIMELOCK);
+    vm.assume(_executor != timelockMultiAdminShim);
+
+    uint256 requiredEthAmount = 1 ether;
+    _testProposalRequiringEthAndEthIsSentWithExecuteCall(requiredEthAmount, _executor);
+  }
 }
