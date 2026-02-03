@@ -34,18 +34,13 @@ contract DeployCouncilExecutor is Script, BaseLogger {
   /// @param _shim Address of the TimelockMultiAdminShim
   /// @param _accessManager Address of the shared AccessManager (deployed via script 4)
   /// @return executor The deployed CouncilExecutor
-  function run(
-    address _councilVetoGovernor,
-    address payable _shim,
-    address _accessManager
-  ) public returns (CouncilExecutor executor) {
+  function run(address _councilVetoGovernor, address payable _shim, address _accessManager)
+    public
+    returns (CouncilExecutor executor)
+  {
     vm.startBroadcast();
 
-    executor = new CouncilExecutor(
-      _councilVetoGovernor,
-      TimelockMultiAdminShim(_shim),
-      _accessManager
-    );
+    executor = new CouncilExecutor(_councilVetoGovernor, TimelockMultiAdminShim(_shim), _accessManager);
 
     vm.stopBroadcast();
 

@@ -79,11 +79,7 @@ contract CouncilExecutor is TimelockController, AccessManaged {
                             Constructor
   //////////////////////////////////////////////////////////////*/
 
-  constructor(
-    address _councilVetoGovernor,
-    TimelockMultiAdminShim _shim,
-    address _accessManager
-  )
+  constructor(address _councilVetoGovernor, TimelockMultiAdminShim _shim, address _accessManager)
     TimelockController(0, new address[](0), new address[](0), address(0))
     AccessManaged(_accessManager)
   {
@@ -111,7 +107,8 @@ contract CouncilExecutor is TimelockController, AccessManaged {
     address[] calldata _targets,
     uint256[] calldata _values,
     bytes[] calldata _payloads,
-    bytes32 /*_predecessor*/,
+    bytes32,
+    /*_predecessor*/
     bytes32 _salt,
     uint256 /*_delay*/
   ) public virtual override onlyCouncilVetoGovernor {
@@ -133,7 +130,8 @@ contract CouncilExecutor is TimelockController, AccessManaged {
     address[] calldata _targets,
     uint256[] calldata _values,
     bytes[] calldata _payloads,
-    bytes32 /*_predecessor*/,
+    bytes32,
+    /*_predecessor*/
     bytes32 _salt
   ) public payable virtual override onlyCouncilVetoGovernor {
     // Validate lengths
@@ -277,8 +275,7 @@ contract CouncilExecutor is TimelockController, AccessManaged {
   /// @param _target Contract being called in the batch.
   /// @param _selector Function selector extracted from calldata.
   function _checkAccess(address _target, bytes4 _selector) internal view {
-    (bool immediate, uint32 delay) =
-      IAccessManager(authority()).canCall(msg.sender, _target, _selector);
+    (bool immediate, uint32 delay) = IAccessManager(authority()).canCall(msg.sender, _target, _selector);
 
     if (!immediate || delay != 0) {
       revert AccessManagedUnauthorized(msg.sender);
