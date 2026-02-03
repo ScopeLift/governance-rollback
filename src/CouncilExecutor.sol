@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
+// External Imports
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 import {TimelockMultiAdminShim} from "./TimelockMultiAdminShim.sol";
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
+import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
 
 /// @title CouncilExecutor
 /// @author [ScopeLift](https://scopelift.co)
@@ -18,7 +21,7 @@ import {TimelockMultiAdminShim} from "./TimelockMultiAdminShim.sol";
 ///
 ///      This allows the veto governor to use OpenZeppelin's standard governor-timelock integration
 ///      while ultimately queuing and executing transactions on the existing Compound Timelock.
-contract CouncilExecutor is TimelockController {
+contract CouncilExecutor is TimelockController, AccessManaged {
   /*///////////////////////////////////////////////////////////////
                             Errors
   //////////////////////////////////////////////////////////////*/
@@ -76,8 +79,13 @@ contract CouncilExecutor is TimelockController {
                             Constructor
   //////////////////////////////////////////////////////////////*/
 
-  constructor(address _councilVetoGovernor, TimelockMultiAdminShim _shim)
+  constructor(
+    address _councilVetoGovernor,
+    TimelockMultiAdminShim _shim,
+    address _accessManager
+  )
     TimelockController(0, new address[](0), new address[](0), address(0))
+    AccessManaged(_accessManager)
   {
     COUNCIL_VETO_GOVERNOR = _councilVetoGovernor;
     SHIM = _shim;
@@ -264,7 +272,16 @@ contract CouncilExecutor is TimelockController {
     }
   }
 
+  /// @notice Delegates to the authority (AccessManager) to enforce selector-based access on scheduled/executed targets.
+  /// @dev Rejects delayed permissions: only immediate execution is allowed (no AccessManager schedule/execute flow).
+  /// @param _target Contract being called in the batch.
+  /// @param _selector Function selector extracted from calldata.
   function _checkAccess(address _target, bytes4 _selector) internal view {
-    // TODO: Implement access control check here
+    (bool immediate, uint32 delay) =
+      IAccessManager(authority()).canCall(msg.sender, _target, _selector);
+
+    if (!immediate || delay != 0) {
+      revert AccessManagedUnauthorized(msg.sender);
+    }
   }
 }
